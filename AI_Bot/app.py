@@ -1,0 +1,117 @@
+"""The Flask application.
+
+This process serves the web UI, proxies chat and voice calls to
+Gemini, and receives WhatsApp events from the sidecar.
+
+Run it as its own process:
+
+    python app.py
+"""
+
+from flask import Flask, jsonify, render_template, request
+from sqlalchemy import select
+
+from config import settings
+from database.database import init_db, session_scope
+from models import Message
+from routes import chat, telegram, voice, whatsapp
+from services import memory
+
+app = Flask(__name__)
+
+app.register_blueprint(chat.bp)
+app.register_blueprint(voice.bp)
+app.register_blueprint(whatsapp.bp)
+app.register_blueprint(telegram.bp)
+
+# Create the tables on import, not only when run as a script, so the
+# schema exists however the app is started.
+init_db()
+
+
+@app.route("/")
+def home():
+    """The chat and voice page."""
+
+    return render_template("index.html")
+
+
+@app.route("/messages")
+def messages_page():
+    """Browse the captured WhatsApp messages."""
+
+    contact_query = request.args.get("contact", "").strip()
+
+    limit = 50
+
+    with session_scope() as session:
+
+        contacts = memory.all_contacts(session)
+
+        contact = None
+
+        if contact_query:
+            contact = memory.resolve_contact(session, contact_query)
+
+        if contact is not None:
+            rows = memory.recent_from(session, contact, limit=limit)
+
+        else:
+            rows = list(
+                session.scalars(
+                    select(Message)
+                    .order_by(Message.sent_at.desc())
+                    .limit(limit)
+                )
+            )
+
+        contact_rows = [
+            {
+                "id": item.id,
+                "label": item.label,
+                "mode": memory.get_preference(session, item).notify_mode,
+            }
+            for item in contacts
+        ]
+
+        message_rows = [
+            {
+                "id": row.id,
+                "contact": row.contact.label if row.contact else "unknown",
+                "body": row.body,
+                "summary": row.summary,
+                "sent_at": row.sent_at.strftime("%d %b %H:%M") if row.sent_at else "",
+                "is_deleted": row.is_deleted,
+            }
+            for row in rows
+        ]
+
+    return render_template(
+        "messages.html",
+        contacts=contact_rows,
+        messages=message_rows,
+        query=contact_query,
+    )
+
+
+@app.route("/health")
+def health():
+    """A quick check that the service is up."""
+
+    return jsonify(
+        {
+            "ok": True,
+            "gemini": settings.has_gemini,
+            "telegram": settings.has_telegram,
+            "tmdb": settings.has_tmdb,
+            "whatsapp_intake": bool(settings.wa_shared_secret),
+            "region": settings.watch_region,
+        }
+    )
+
+
+if __name__ == "__main__":
+    print(f"Database: {settings.db_path}")
+    print(f"Region:   {settings.watch_region}")
+
+    app.run(host="127.0.0.1", port=5000, debug=True)

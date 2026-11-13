@@ -1,0 +1,120 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# =========================
+# Virtual Environment
+# =========================
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+# Node
+# =========================
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# WhatsApp session credentials, never commit these.
+# The ** prefix is needed so this matches at any depth, since the
+# project sits in a subfolder of the repository.
+**/whatsapp_sidecar/auth/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Jupyter Notebook
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Testing / Coverage
+# =========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# =========================
+# Build / Distribution
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Temporary Files
+# =========================
+*.tmp
+*.temp
+*.bak
+
+# =========================
+# Database
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Generated Files
+# =========================
+uploads/
+outputs/
+generated/
+tmp/
+temp/
+
+# =========================
+# Machine Learning / AI
+# =========================
+models/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# =========================
+# Secrets / API Keys
+# =========================
+*.pem
+*.key
+secrets.json
+credentials.json

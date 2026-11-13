@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Messages — AI Bot</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="topbar">
+        <a href="/">← Back to chat</a>
+        <h1>Messages</h1>
+    </div>
+
+    <div class="messages-layout">
+
+        <aside class="contacts-panel">
+
+            <h2>Contacts</h2>
+
+            {% if not contacts %}
+                <p class="empty">No contacts yet.</p>
+            {% else %}
+                <ul class="contact-list">
+                    {% for contact in contacts %}
+                        <li>
+                            <a href="/messages?contact={{ contact.label | urlencode }}">
+                                {{ contact.label }}
+                            </a>
+                            <span class="mode">{{ contact.mode }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+        </aside>
+
+        <main class="messages-panel">
+
+            <form class="search-form" method="get" action="/messages">
+                <input
+                    type="text"
+                    name="contact"
+                    placeholder="Search by contact name..."
+                    value="{{ query }}"
+                >
+                <button type="submit">Filter</button>
+                {% if query %}
+                    <a class="clear" href="/messages">Clear</a>
+                {% endif %}
+            </form>
+
+            {% if not messages %}
+                <p class="empty">Nothing captured yet.</p>
+            {% else %}
+                <ul class="message-list">
+                    {% for message in messages %}
+                        <li class="message-row{% if message.is_deleted %} deleted{% endif %}">
+                            <div class="meta">
+                                <strong>{{ message.contact }}</strong>
+                                <span>{{ message.sent_at }}</span>
+                                {% if message.is_deleted %}
+                                    <span class="badge">deleted</span>
+                                {% endif %}
+                            </div>
+                            {% if message.summary %}
+                                <p class="summary">{{ message.summary }}</p>
+                            {% endif %}
+                            <p class="raw">{{ message.body }}</p>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+        </main>
+
+    </div>
+
+</body>
+</html>

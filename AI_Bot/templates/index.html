@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Bot</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="mode-buttons">
+
+    <button id="chat-mode">
+        💬 Chat
+    </button>
+
+    <button id="voice-mode">
+        🎙 Voice
+    </button>
+
+    <a class="messages-link" href="/messages">
+        🗂 Messages
+    </a>
+
+</div>
+
+    <div class="chat-container">
+
+        <h1>AI Bot</h1>
+
+        <div id="chat-box"></div>
+
+        <div class="input-area">
+
+            <input
+                type="text"
+                id="message"
+                placeholder="Ask anything..."
+                autocomplete="off"
+            >
+
+            <button onclick="sendMessage()">
+                Send
+            </button>
+
+        </div>
+
+    </div>
+
+    <div id="voice-panel" style="display: none;">
+
+    <button id="start-voice">
+        🎙 Start Voice
+    </button>
+
+    <button id="stop-voice" disabled>
+        ⏹ Stop
+    </button>
+
+    <p id="voice-status">
+        Voice mode is ready.
+    </p>
+
+</div>
+
+    <script type="importmap">
+{
+    "imports": {
+        "@google/genai": "https://esm.run/@google/genai"
+    }
+}
+</script>
+
+<script type="module" src="{{ url_for('static', filename='script.js') }}"></script> 
+
+</body>
+</html>
