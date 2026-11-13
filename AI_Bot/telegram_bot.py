@@ -32,7 +32,12 @@ async def on_startup(app: Application):
 def build_application() -> Application:
     """Assemble the bot with every handler registered."""
 
-    application = Application.builder().token(settings.telegram_bot_token).build()
+    application = (
+        Application.builder()
+        .token(settings.telegram_bot_token)
+        .post_init(on_startup)
+        .build()
+    )
 
     for handler in command_handlers.build_command_handlers():
         application.add_handler(handler)
@@ -78,10 +83,7 @@ def main():
     print(f"   chat model : {settings.gemini_chat_model}")
     print(f"   database   : {settings.db_path}")
 
-    application.run_polling(
-        drop_pending_updates=True,
-        post_init=on_startup,
-    )
+    application.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":

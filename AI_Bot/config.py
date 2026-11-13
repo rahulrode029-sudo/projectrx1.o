@@ -6,6 +6,7 @@ instead of reading os.getenv() in scattered modules.
 """
 
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,6 +94,35 @@ class Settings:
         return bool(self.tmdb_api_key)
 
 
+def _warn_about_malformed_env():
+    """Catch a value that has another assignment glued onto it.
+
+    This happens when a file has no trailing newline and something is
+    appended to it. The result looks like a valid but wrong value, and
+    the only symptom is an API rejecting it much later.
+    """
+
+    pattern = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\s*=")
+
+    for name, value in os.environ.items():
+
+        if not name.startswith(("GEMINI", "TELEGRAM", "TMDB", "WA_", "DB_", "MEDIA_")):
+            continue
+
+        if not value:
+            continue
+
+        match = pattern.search(value)
+
+        if match and match.start() > 0:
+            print(
+                f"WARNING: the {name} value in .env looks malformed. It "
+                f"contains another assignment at position {match.start()}, "
+                f"which usually means the file was missing a newline. "
+                f"Check .env and put every setting on its own line."
+            )
+
+
 def load_settings() -> Settings:
     """Build the settings object from the current environment."""
 
@@ -119,3 +149,5 @@ def load_settings() -> Settings:
 
 
 settings = load_settings()
+
+_warn_about_malformed_env()
