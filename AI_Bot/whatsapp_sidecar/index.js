@@ -26,6 +26,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   DisconnectReason,
+  fetchLatestBaileysVersion,
+  fetchLatestWaWebVersion,
   makeWASocket,
   useMultiFileAuthState,
   WAMessageStubType,
@@ -43,6 +45,10 @@ const CONFIG = {
   authFolder: process.env.WA_AUTH_FOLDER || path.join(__dirname, 'auth'),
   helperPort: Number(process.env.WA_HELPER_PORT || 8787),
   reconnectDelay: 5000,
+  // The number to link, digits only with the country code. When it
+  // is set a pairing code is requested automatically, so the phone
+  // can be linked without scanning the QR at all.
+  pairingPhone: (process.env.WA_PAIRING_PHONE || '').replace(/\D/g, ''),
 };
 
 let stopping = false;
@@ -88,6 +94,46 @@ async function postEvent(payload) {
 // =====================================================
 // LOGIN HELPER
 // =====================================================
+
+/**
+ * Find the WhatsApp Web version to connect with.
+ *
+ * The version bundled with Baileys goes stale, and a stale client
+ * revision blocks linking. Ask WhatsApp for the current one and fall
+ * back to the bundled list if that cannot be reached.
+ */
+async function resolveWebVersion() {
+  try {
+    const latest = await fetchLatestWaWebVersion();
+
+    if (latest && latest.version) {
+      console.log(`WhatsApp Web version: ${latest.version.join('.')}`);
+      return latest.version;
+    }
+  } catch (error) {
+    console.log(
+      `Could not fetch the WhatsApp Web version: ${error.message}`,
+    );
+  }
+
+  try {
+    const fallback = await fetchLatestBaileysVersion();
+
+    if (fallback && fallback.version) {
+      console.log(
+        `Falling back to the Baileys bundled version: ` +
+          `${fallback.version.join('.')}`,
+      );
+      return fallback.version;
+    }
+  } catch (error) {
+    console.log(`Could not fetch the Baileys version: ${error.message}`);
+  }
+
+  console.log('Using whatever version Baileys defaults to.');
+
+  return undefined;
+}
 
 /**
  * Clear a session that was never finished.
@@ -494,10 +540,13 @@ async function startSocket() {
   clearUnfinishedSession();
 
   const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authFolder);
+
+  const version = await resolveWebVersion();
+
   sock = makeWASocket({
     auth: state,
-    printQRInTerminal: false,
     browser: ['RX', 'Chrome', '120.0'],
+    ...(version ? { version } : {}),
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -513,6 +562,19 @@ async function startSocket() {
       console.log(
         `\nPrefer a bigger code? Open http://127.0.0.1:${CONFIG.helperPort}/qr\n`,
       );
+
+      // The QR event also fires while a pairing code is possible, so
+      // this is the right moment to ask for one. Requesting it here
+      // means the socket is in the registration state it needs.
+      if (CONFIG.pairingPhone && !currentPairingCode) {
+        try {
+          await requestPairingCode(CONFIG.pairingPhone);
+        } catch (error) {
+          console.log(
+            `Could not request a pairing code: ${error.message}`,
+          );
+        }
+      }
     }
 
     if (connection === 'open') {
@@ -523,6 +585,11 @@ async function startSocket() {
 
     if (connection === 'close') {
       isConnected = false;
+
+      // The pairing code is tied to the socket that asked for it, so
+      // it is useless once that socket is gone. A fresh one is
+      // requested when the next QR arrives.
+      currentPairingCode = null;
 
       const status = lastDisconnect?.error?.output?.statusCode;
 

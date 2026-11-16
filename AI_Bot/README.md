@@ -110,18 +110,36 @@ npm install
 npm start
 ```
 
-The first run prints a QR code in the terminal. **Open
-http://127.0.0.1:5000/qr instead** — it shows the same code large, as
-an image, and refreshes itself so it never expires while you are
-aiming your phone.
+`npm install` applies a patch to Baileys automatically. This matters:
+around 2026-07-28 WhatsApp added a `companion_reg_refresh` stage to
+device registration, and no published Baileys release handles it, so
+pairing fails with *"Couldn't link device"* on both the QR and the
+pairing code path. The patch in `patches/` carries the upstream fixes
+until they are released.
+
+If your npm blocks install scripts, approve them once:
+
+```powershell
+npm approve-scripts --allow-scripts-pending
+npm run setup      # applies the patch by hand
+```
+
+The sidecar also asks WhatsApp for the current Web version at startup
+instead of trusting the version bundled with Baileys, which goes stale
+and blocks linking on its own.
+
+Open **http://127.0.0.1:5000/qr** to see the login code large enough
+to scan comfortably. It refreshes itself, so it never expires while
+you are aiming your phone.
 
 On the phone: WhatsApp → **Settings** → **Linked devices** → **Link a
 Device**. Point the camera at the code.
 
-If you cannot scan from the screen, the same page has a **pairing
-code** box: enter your number with country code, get an eight
-character code that does not expire, and on the phone choose *Link
-with phone number instead*.
+Or use the **pairing code** on the same page: an eight character code
+that does not expire. On the phone choose *Link with phone number
+instead*, enter your number, then type the code. Set
+`WA_PAIRING_PHONE` in `.env` and the code is generated for you
+automatically.
 
 The session is saved in `whatsapp_sidecar/auth/`, so you only do this
 once and it reconnects on its own after a restart.

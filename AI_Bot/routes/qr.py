@@ -10,6 +10,8 @@ Everything here talks to the sidecar's small helper server on port
 8787. The QR itself is never stored.
 """
 
+import io
+
 import httpx
 import segno
 from flask import Blueprint, Response, jsonify, render_template, request
@@ -53,16 +55,28 @@ def _helper_state():
 
 
 def _qr_svg(data, scale=8):
-    """Render a QR string as an SVG image."""
+    """Render a QR string as a standalone SVG image.
+
+    `save` is used rather than `svg_inline` because a standalone SVG
+    loaded through an <img> tag has to declare the SVG namespace.
+    Without it the browser refuses the image and shows a broken icon
+    instead of the code.
+    """
 
     code = segno.make(data, error="m")
 
-    return code.svg_inline(
+    buffer = io.BytesIO()
+
+    code.save(
+        buffer,
+        kind="svg",
         scale=scale,
         border=4,
         dark="#1a202c",
         light="#ffffff",
     )
+
+    return buffer.getvalue()
 
 
 @bp.route("/qr", methods=["GET"])

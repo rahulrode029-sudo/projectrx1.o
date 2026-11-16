@@ -6,7 +6,9 @@
   "description": "Connects to WhatsApp and forwards message and delete events to the Python app.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "setup": "patch-package",
+    "postinstall": "patch-package"
   },
   "engines": {
     "node": ">=20"
@@ -14,5 +16,12 @@
   "dependencies": {
     "baileys": "7.0.0-rc14",
     "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
+  },
+  "allowScripts": {
+    "baileys@7.0.0-rc14": true,
+    "protobufjs@7.6.6": true
   }
 }

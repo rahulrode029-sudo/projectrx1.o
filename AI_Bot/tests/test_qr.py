@@ -55,7 +55,15 @@ def test_qr_svg_renders_the_code(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.headers["Content-Type"].startswith("image/svg+xml")
-    assert b"<svg" in response.get_data()[:150]
+
+    data = response.get_data()
+
+    assert b"<svg" in data[:150]
+
+    # A standalone SVG loaded through an <img> tag has to declare the
+    # SVG namespace. Without it the browser refuses the image and
+    # shows a broken icon instead of the code.
+    assert b'xmlns="http://www.w3.org/2000/svg"' in data
 
 
 def test_qr_page_shows_the_code_when_one_is_available(client, monkeypatch):

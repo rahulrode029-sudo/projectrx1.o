@@ -71,6 +71,7 @@ class Settings:
     # --- WhatsApp ---
     wa_shared_secret: str
     wa_owner_phone: str
+    wa_pairing_phone: str
     wa_sidecar_url: str
     wa_helper_url: str
 
@@ -141,6 +142,9 @@ def load_settings() -> Settings:
         telegram_owner_id=_env("TELEGRAM_OWNER_ID", ""),
         wa_shared_secret=_env("WA_SHARED_SECRET", ""),
         wa_owner_phone=_env("WA_OWNER_PHONE", ""),
+        # The number the sidecar links to. Digits only, with the
+        # country code.
+        wa_pairing_phone=_env("WA_PAIRING_PHONE", ""),
         # Where the sidecar sends its events to: the Flask app.
         wa_sidecar_url=_env("WA_SIDECAR_URL", "http://127.0.0.1:5000"),
         # Where the app reads the login QR from: the sidecar helper.
