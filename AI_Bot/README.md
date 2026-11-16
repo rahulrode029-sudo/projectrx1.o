@@ -110,9 +110,21 @@ npm install
 npm start
 ```
 
-The first run prints a QR code. Scan it with the phone that has the
-WhatsApp account you want to archive — it links as a second device.
-The session is saved in `whatsapp_sidecar/auth/`, so you only scan once.
+The first run prints a QR code in the terminal. **Open
+http://127.0.0.1:5000/qr instead** — it shows the same code large, as
+an image, and refreshes itself so it never expires while you are
+aiming your phone.
+
+On the phone: WhatsApp → **Settings** → **Linked devices** → **Link a
+Device**. Point the camera at the code.
+
+If you cannot scan from the screen, the same page has a **pairing
+code** box: enter your number with country code, get an eight
+character code that does not expire, and on the phone choose *Link
+with phone number instead*.
+
+The session is saved in `whatsapp_sidecar/auth/`, so you only do this
+once and it reconnects on its own after a restart.
 
 > Use a **spare number** if you can. Baileys is an unofficial WhatsApp
 > client, and using one risks WhatsApp banning the number. A prepaid
@@ -208,7 +220,12 @@ the project root shadows the installed `python-telegram-bot`. The
 handlers live in `telegram_handlers/` for this reason.
 
 **The sidecar says "not logged in"** — delete `whatsapp_sidecar/auth/`
-and scan the QR again.
+and scan the QR again. The sidecar also clears an unfinished session
+by itself, so this only happens if the device was unlinked from the
+phone.
+
+**The QR page says the sidecar is not running** — check that
+`whatsapp_sidecar` is up. `run.py` prints a warning if it exits.
 
 **Telegram bot does not answer** — check the token in `.env` and make
 sure only one instance is polling at a time.
