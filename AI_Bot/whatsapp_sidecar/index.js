@@ -166,6 +166,10 @@ async function requestPairingCode(phone) {
 /**
  * A tiny local server so the QR and the pairing code can be shown in
  * a browser, which is much easier to scan than a terminal.
+ *
+ * This is started exactly once. The socket is rebuilt whenever the
+ * connection drops, and the helper must not be rebuilt with it or the
+ * second bind fails with EADDRINUSE and takes the process down.
  */
 function startHelperServer() {
   const server = http.createServer((req, res) => {
@@ -207,6 +211,20 @@ function startHelperServer() {
     }
 
     send(404, { error: 'not found' });
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(
+        `Port ${CONFIG.helperPort} is already in use. Another sidecar ` +
+          `is probably still running. Close it, or set ` +
+          `WA_HELPER_PORT to a different port.`,
+      );
+    } else {
+      console.error('The login helper server failed:', error.message);
+    }
+
+    process.exit(1);
   });
 
   server.listen(CONFIG.helperPort, '127.0.0.1', () => {
@@ -464,13 +482,13 @@ async function onContactsUpsert(contacts) {
 // MAIN
 // =====================================================
 
-async function start() {
+async function startSocket() {
   if (!CONFIG.sharedSecret) {
     console.error(
       'WA_SHARED_SECRET is not set. Copy it from ../.env into this ' +
         "process's environment before starting.",
     );
-    return;
+    process.exit(1);
   }
 
   clearUnfinishedSession();
@@ -521,7 +539,7 @@ async function start() {
 
       if (!stopping) {
         console.log(`Disconnected (${status}). Reconnecting shortly...`);
-        setTimeout(() => start(), CONFIG.reconnectDelay);
+        setTimeout(() => startSocket(), CONFIG.reconnectDelay);
       }
     }
   });
@@ -530,22 +548,29 @@ async function start() {
   sock.ev.on('messages.update', onMessagesUpdate);
   sock.ev.on('messages.delete', onMessagesDelete);
   sock.ev.on('contacts.upsert', onContactsUpsert);
-
-  process.on('SIGINT', async () => {
-    console.log('\nStopping...');
-    stopping = true;
-    try {
-      await sock.end(undefined);
-    } catch (error) {
-      // Nothing to do if the socket is already gone.
-    }
-    process.exit(0);
-  });
-
-  startHelperServer();
 }
 
-start().catch((error) => {
+process.on('SIGINT', async () => {
+  console.log('\nStopping...');
+  stopping = true;
+
+  try {
+    if (sock) {
+      await sock.end(undefined);
+    }
+  } catch (error) {
+    // Nothing to do if the socket is already gone.
+  }
+
+  process.exit(0);
+});
+
+// The helper is started once for the life of the process. The socket
+// is rebuilt on every reconnect, but the helper must not be, or the
+// second bind to the port fails and the process dies.
+startHelperServer();
+
+startSocket().catch((error) => {
   console.error('Sidecar failed to start:', error);
   process.exit(1);
 });

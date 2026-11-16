@@ -34,6 +34,29 @@ def _load_env():
     load_dotenv(BASE_DIR / ".env")
 
 
+def _port_free(port):
+    """True when nothing is listening on the port."""
+
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+
+        return probe.connect_ex(("127.0.0.1", port)) != 0
+
+
+def _check_ports():
+    """Warn about ports that are already taken."""
+
+    for port, name in ((5000, "the web app"), (8787, "the WhatsApp helper")):
+
+        if not _port_free(port):
+            print(
+                f"WARNING: port {port} is already in use, so {name} may "
+                f"fail to start. Close whatever is using it and try again."
+            )
+
+
 def start_flask():
     print("starting the web app on http://127.0.0.1:5000")
 
@@ -70,18 +93,26 @@ def start_sidecar():
 def main():
     _load_env()
 
-    processes = []
+    _check_ports()
 
-    for starter in (start_flask, start_telegram, start_sidecar):
+    processes = []
+    names = {}
+
+    for name, starter in (
+        ("the web app", start_flask),
+        ("the Telegram bot", start_telegram),
+        ("the WhatsApp sidecar", start_sidecar),
+    ):
 
         try:
             process = starter()
         except Exception as error:
-            print(f"could not start: {error}")
+            print(f"could not start {name}: {error}")
             continue
 
         if process is not None:
             processes.append(process)
+            names[process.pid] = name
 
         time.sleep(1)
 
@@ -94,8 +125,14 @@ def main():
 
             for process in processes:
 
-                if process.poll() is not None:
-                    print(f"a process exited with {process.returncode}")
+                code = process.poll()
+
+                if code is not None and process.pid in names:
+                    print(
+                        f"WARNING: {names[process.pid]} exited with code "
+                        f"{code}. Everything else is still running."
+                    )
+                    del names[process.pid]
 
             time.sleep(2)
 

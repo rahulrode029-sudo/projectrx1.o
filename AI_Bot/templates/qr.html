@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Link WhatsApp — AI Bot</title>
+    <title>Link WhatsApp — RX</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -12,53 +12,100 @@
         body { background: #f5f5f5; }
 
         .qr-wrap {
-            max-width: 640px;
+            max-width: 680px;
             margin: 40px auto;
             background: white;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
+            border-radius: 14px;
+            padding: 30px 34px 34px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
 
-        .qr-wrap h1 { font-size: 22px; }
+        .qr-wrap h1 { font-size: 22px; margin-bottom: 4px; }
+
+        .sub { color: #718096; font-size: 14px; margin-top: 0; }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 18px;
+        }
+
+        .badge.ok   { background: #c6f6d5; color: #276749; }
+        .badge.wait { background: #feebc8; color: #975a16; }
+        .badge.down { background: #fed7d7; color: #9b2c2c; }
 
         .qr-frame {
             display: inline-block;
-            padding: 16px;
+            padding: 14px;
             background: white;
             border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            margin: 20px 0;
+            border-radius: 12px;
+            margin: 4px 0 18px;
         }
 
-        .qr-frame img { display: block; width: 340px; height: 340px; }
+        .qr-frame img { display: block; width: 320px; height: 320px; }
 
-        .steps { text-align: left; display: inline-block; margin: 10px 0 20px; }
-        .steps li { margin-bottom: 8px; }
+        .placeholder {
+            width: 348px;
+            height: 348px;
+            margin: 4px 0 18px;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #a0aec0;
+            font-size: 14px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
 
-        .pairing { border-top: 1px solid #e2e8f0; margin-top: 26px; padding-top: 22px; }
+        .steps { text-align: left; display: inline-block; margin: 6px 0 4px; }
+        .steps li { margin-bottom: 9px; line-height: 1.5; }
+
+        .panel {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 26px;
+            padding-top: 24px;
+        }
+
+        .panel h2 { font-size: 17px; margin: 0 0 4px; }
+
         .pairing input {
-            padding: 10px; border: 1px solid #ccc; border-radius: 6px; width: 220px;
+            padding: 11px; border: 1px solid #cbd5e0; border-radius: 6px;
+            width: 230px; font-size: 15px;
         }
-        .pairing button { padding: 10px 18px; }
+        .pairing button { padding: 11px 20px; font-size: 15px; background: #4a5568; color: white; }
 
         .code {
-            font-family: Consolas, monospace;
-            font-size: 34px;
-            letter-spacing: 8px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 36px;
+            letter-spacing: 10px;
             font-weight: bold;
             color: #2d3748;
             background: #edf2f7;
-            padding: 14px 22px;
-            border-radius: 8px;
+            padding: 16px 22px;
+            border-radius: 10px;
             display: inline-block;
-            margin: 12px 0;
+            margin: 6px 0 14px;
+            cursor: pointer;
+            user-select: all;
         }
 
-        .status { font-size: 14px; color: #718096; margin-top: 14px; }
-        .good { color: #276749; font-weight: bold; }
-        .bad { color: #c53030; }
-        .hint { color: #a0aec0; font-size: 13px; margin-top: 10px; }
+        .hint { color: #718096; font-size: 13px; line-height: 1.6; }
+
+        .status { font-size: 14px; margin-top: 12px; min-height: 20px; }
+        .good { color: #276749; }
+        .bad  { color: #c53030; }
+
+        code {
+            background: #edf2f7; padding: 2px 6px; border-radius: 4px;
+            font-size: 13px;
+        }
     </style>
 </head>
 
@@ -67,57 +114,51 @@
 <div class="qr-wrap">
 
     <h1>Link your WhatsApp</h1>
+    <p class="sub">Do this once. After that the bot stays linked and reconnects on its own.</p>
 
-    {% if error %}
-        <p class="status bad">
-            The WhatsApp sidecar is not reachable at {{ url_for('qr.qr_page') }}'s helper.
-            Start it with <code>python run.py</code>.
-        </p>
-    {% endif %}
+    <div id="badge" class="badge wait">Checking the sidecar...</div>
 
-    {% if connected %}
-        <p class="status good">Connected. You can close this page.</p>
-    {% endif %}
+    <div id="qr-area">
+        {% if qr %}
+            <div class="qr-frame">
+                <img id="qr-image" src="{{ url_for('qr.qr_svg') }}"
+                     alt="WhatsApp login QR code">
+            </div>
+        {% else %}
+            <div class="placeholder" id="placeholder">
+                {% if sidecar_down %}
+                    The WhatsApp sidecar is not running.<br><br>
+                    Start the suite with <code>python run.py</code>
+                    and reopen this page.
+                {% else %}
+                    Waiting for the sidecar to produce a QR code...
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
 
-    {% if qr %}
-        <p>Point your phone's camera at this code.</p>
+    <ol class="steps" id="steps" {% if not qr %}style="display:none"{% endif %}>
+        <li>Open WhatsApp on the phone you want to archive.</li>
+        <li>Go to <strong>Settings</strong> &rarr; <strong>Linked devices</strong> &rarr; <strong>Link a Device</strong>.</li>
+        <li>Point the camera at the code above.</li>
+    </ol>
 
-        <div class="qr-frame">
-            <img id="qr-image" src="{{ url_for('qr.qr_svg') }}" alt="WhatsApp login QR code">
-        </div>
-
-        <p class="status">This code refreshes every few seconds.</p>
-
-        <ol class="steps">
-            <li>Open WhatsApp on the phone you want to archive.</li>
-            <li>Settings &rarr; <strong>Linked devices</strong> &rarr; <strong>Link a Device</strong>.</li>
-            <li>Point the camera at the code above.</li>
-        </ol>
-    {% else %}
-        <p class="status">Waiting for the sidecar to produce a QR code...</p>
-    {% endif %}
-
-    <div class="pairing">
+    <div class="panel pairing">
 
         <h2>Or use a pairing code</h2>
 
         <p class="hint">
-            Better if you cannot scan from this screen. On the phone choose
-            <strong>Link with phone number instead</strong>, then enter the
-            number and the code.
+            Better if you cannot scan a code from this screen. On the phone
+            choose <strong>Link with phone number instead</strong>, enter
+            the number, then enter the code. This code does not expire.
         </p>
 
         {% if pairing_code %}
-            <div class="code" id="pairing-code">{{ pairing_code }}</div>
+            <div class="code" id="pairing-code" title="Click to copy">{{ pairing_code }}</div>
         {% endif %}
 
         <form id="pairing-form">
-            <input
-                type="tel"
-                id="phone"
-                placeholder="Number with country code"
-                value="91"
-            >
+            <input type="tel" id="phone" placeholder="Number with country code" value="91">
             <button type="submit">Get code</button>
         </form>
 
@@ -125,55 +166,119 @@
 
     </div>
 
+    <div class="panel">
+        <p class="hint">
+            <strong>After it links</strong>, send <code>/start</code> to
+            <code>@sahilr_ai_assistant_bot</code>. That is how the bot learns
+            where to send your notifications.
+        </p>
+    </div>
+
 </div>
 
 <script>
-    // Keep the QR image current. WhatsApp expires it quickly.
-    setInterval(function () {
-        var image = document.getElementById("qr-image");
-        if (image) {
-            image.src = "{{ url_for('qr.qr_svg') }}?t=" + Date.now();
+    (function () {
+        var badge = document.getElementById("badge");
+        var area = document.getElementById("qr-area");
+        var steps = document.getElementById("steps");
+        var lastQr = {{ qr | tojson }};
+
+        function setBadge(text, kind) {
+            badge.textContent = text;
+            badge.className = "badge " + kind;
         }
-    }, 4000);
 
-    document.getElementById("pairing-form").addEventListener("submit", function (event) {
-        event.preventDefault();
+        // Poll for state so the page recovers on its own if the
+        // sidecar starts late or restarts.
+        setInterval(function () {
+            fetch("{{ url_for('qr.qr_status') }}")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.sidecarDown) {
+                        setBadge("Sidecar is not running", "down");
+                        return;
+                    }
 
-        var result = document.getElementById("pairing-result");
-        var phone = document.getElementById("phone").value.trim();
+                    if (data.connected) {
+                        setBadge("Linked to WhatsApp", "ok");
+                    } else if (data.qr) {
+                        setBadge("Waiting for you to scan", "wait");
+                    } else {
+                        setBadge("Waiting for a QR code", "wait");
+                    }
 
-        result.textContent = "Asking the sidecar...";
+                    if (data.qr && data.qr !== lastQr) {
+                        lastQr = data.qr;
+                        area.innerHTML =
+                            '<div class="qr-frame">' +
+                            '<img id="qr-image" src="{{ url_for('qr.qr_svg') }}?t=' +
+                            Date.now() + '" alt="WhatsApp login QR code"></div>';
+                        steps.style.display = "";
+                    }
+                })
+                .catch(function () {
+                    setBadge("Sidecar is not running", "down");
+                });
+        }, 3000);
 
-        fetch("{{ url_for('qr.pairing') }}", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: phone })
-        })
-        .then(function (response) { return response.json(); })
-        .then(function (data) {
-            if (data.error) {
-                result.textContent = data.error;
+        var form = document.getElementById("pairing-form");
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            var result = document.getElementById("pairing-result");
+            var phone = document.getElementById("phone").value.trim();
+
+            result.textContent = "Asking the sidecar...";
+            result.className = "status";
+
+            fetch("{{ url_for('qr.pairing') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: phone })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    result.textContent = data.error;
+                    result.className = "status bad";
+                    return;
+                }
+
+                result.textContent = "Type this code on your phone.";
+                result.className = "status good";
+
+                var box = document.getElementById("pairing-code");
+
+                if (!box) {
+                    box = document.createElement("div");
+                    box.className = "code";
+                    box.id = "pairing-code";
+                    box.title = "Click to copy";
+                    form.parentNode.insertBefore(box, result);
+                }
+
+                box.textContent = data.pairingCode;
+            })
+            .catch(function (error) {
+                result.textContent = String(error);
                 result.className = "status bad";
+            });
+        });
+
+        // Click a pairing code to copy it.
+        document.addEventListener("click", function (event) {
+            if (event.target.id !== "pairing-code") {
                 return;
             }
 
-            result.textContent = "Enter this code on your phone:";
-            result.className = "status good";
+            var text = event.target.textContent.trim();
 
-            var box = document.getElementById("pairing-code");
-            if (!box) {
-                box = document.createElement("div");
-                box.className = "code";
-                box.id = "pairing-code";
-                document.getElementById("pairing-form").parentNode.insertBefore(box, result);
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text);
             }
-            box.textContent = data.pairingCode;
-        })
-        .catch(function (error) {
-            result.textContent = String(error);
-            result.className = "status bad";
         });
-    });
+    })();
 </script>
 
 </body>

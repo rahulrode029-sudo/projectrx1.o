@@ -22,17 +22,34 @@ HELPER_TIMEOUT = 5.0
 
 
 def _helper_state():
-    """Ask the sidecar for the current login state."""
+    """Ask the sidecar for the current login state.
+
+    Never raises: if the sidecar is down the page says so instead of
+    showing an error.
+    """
 
     url = f"{settings.wa_helper_url.rstrip('/')}/qr"
 
     try:
         response = httpx.get(url, timeout=HELPER_TIMEOUT)
         response.raise_for_status()
-        return response.json()
+
+        state = response.json()
+
+        state.setdefault("qr", None)
+        state.setdefault("pairingCode", None)
+        state.setdefault("connected", False)
+        state["error"] = None
+
+        return state
 
     except httpx.HTTPError as error:
-        return {"error": str(error), "qr": None, "pairingCode": None}
+        return {
+            "qr": None,
+            "pairingCode": None,
+            "connected": False,
+            "error": str(error),
+        }
 
 
 def _qr_svg(data, scale=8):
@@ -49,6 +66,7 @@ def _qr_svg(data, scale=8):
 
 
 @bp.route("/qr", methods=["GET"])
+@bp.route("/link", methods=["GET"])
 def qr_page():
     """The helper page."""
 
@@ -59,7 +77,7 @@ def qr_page():
         qr=state.get("qr"),
         pairing_code=state.get("pairingCode"),
         connected=state.get("connected", False),
-        error=state.get("error"),
+        sidecar_down=bool(state.get("error")),
     )
 
 
@@ -75,6 +93,22 @@ def qr_svg():
         return Response("no QR available", status=404, mimetype="text/plain")
 
     return Response(_qr_svg(data), mimetype="image/svg+xml")
+
+
+@bp.route("/qr/status", methods=["GET"])
+def qr_status():
+    """The current state, for the page to poll."""
+
+    state = _helper_state()
+
+    return jsonify(
+        {
+            "qr": state.get("qr"),
+            "pairingCode": state.get("pairingCode"),
+            "connected": state.get("connected", False),
+            "sidecarDown": bool(state.get("error")),
+        }
+    )
 
 
 @bp.route("/qr/pairing", methods=["POST"])
