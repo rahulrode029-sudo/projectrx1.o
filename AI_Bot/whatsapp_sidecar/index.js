@@ -14,9 +14,13 @@
  *     npm start
  *
  * The first run prints a QR code. Scan it with the phone that has the
- * WhatsApp account you want to archive.
+ * WhatsApp account you want to archive. If the terminal QR is hard to
+ * read, open http://127.0.0.1:8787/qr on the computer for a large
+ * one, or request a pairing code from the same page.
  */
 
+import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,10 +41,17 @@ const CONFIG = {
   ),
   sharedSecret: process.env.WA_SHARED_SECRET || '',
   authFolder: process.env.WA_AUTH_FOLDER || path.join(__dirname, 'auth'),
+  helperPort: Number(process.env.WA_HELPER_PORT || 8787),
   reconnectDelay: 5000,
 };
 
 let stopping = false;
+let sock = null;
+
+// The latest login QR, kept so the helper page can show it.
+let currentQr = null;
+let currentPairingCode = null;
+let isConnected = false;
 
 // =====================================================
 // POSTING EVENTS
@@ -72,6 +83,137 @@ async function postEvent(payload) {
     console.error(`[event] ${payload.type} could not be sent:`, error.message);
     return false;
   }
+}
+
+// =====================================================
+// LOGIN HELPER
+// =====================================================
+
+/**
+ * Clear a session that was never finished.
+ *
+ * Asking for a pairing code writes a placeholder identity into the
+ * saved credentials. If the process stops before the phone completes
+ * the pairing, that half finished session is left behind: Baileys
+ * sees an identity and tries to resume a login that never happened,
+ * so it never shows a QR again and the sidecar looks stuck.
+ *
+ * A finished session has `registered` set and a signed identity
+ * key. Anything else is discarded so the login starts over.
+ */
+function clearUnfinishedSession() {
+  const credsPath = path.join(CONFIG.authFolder, 'creds.json');
+
+  if (!fs.existsSync(credsPath)) {
+    return false;
+  }
+
+  let creds;
+
+  try {
+    creds = JSON.parse(fs.readFileSync(credsPath, 'utf-8'));
+  } catch (error) {
+    console.log('The saved session could not be read, clearing it.');
+    creds = {};
+  }
+
+  const finished = creds.registered === true && creds.signedIdentity;
+
+  if (!creds.me || finished) {
+    return false;
+  }
+
+  console.log(
+    'The saved session was never completed, clearing it so a fresh ' +
+      'QR code is shown.',
+  );
+
+  fs.rmSync(CONFIG.authFolder, { recursive: true, force: true });
+  fs.mkdirSync(CONFIG.authFolder, { recursive: true });
+
+  return true;
+}
+
+/**
+ * Ask WhatsApp for an eight character pairing code.
+ *
+ * This is the alternative to scanning the QR. The phone goes to
+ * Linked devices, chooses "Link with phone number instead", types
+ * the number and then types this code.
+ */
+async function requestPairingCode(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+
+  if (digits.length < 8) {
+    throw new Error('the phone number needs a country code');
+  }
+
+  const code = await sock.requestPairingCode(digits);
+
+  currentPairingCode = code;
+
+  console.log('');
+  console.log('  Pairing code: ' + code);
+  console.log('  For number:   +' + digits);
+  console.log('');
+  console.log('  On the phone: WhatsApp > Settings > Linked devices >');
+  console.log('  Link a Device > Link with phone number instead');
+  console.log('');
+
+  return code;
+}
+
+/**
+ * A tiny local server so the QR and the pairing code can be shown in
+ * a browser, which is much easier to scan than a terminal.
+ */
+function startHelperServer() {
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+
+    const send = (status, payload) => {
+      res.statusCode = status;
+      res.end(JSON.stringify(payload));
+    };
+
+    if (req.method === 'GET' && req.url === '/qr') {
+      send(200, {
+        qr: currentQr,
+        pairingCode: currentPairingCode,
+        connected: isConnected,
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/pairing') {
+      let body = '';
+
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
+
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const code = await requestPairingCode(parsed.phone);
+          send(200, { pairingCode: code });
+        } catch (error) {
+          send(500, { error: error.message });
+        }
+      });
+
+      return;
+    }
+
+    send(404, { error: 'not found' });
+  });
+
+  server.listen(CONFIG.helperPort, '127.0.0.1', () => {
+    console.log(
+      `Login helper: http://127.0.0.1:${CONFIG.helperPort}/qr`,
+    );
+  });
 }
 
 // =====================================================
@@ -331,9 +473,10 @@ async function start() {
     return;
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authFolder);
+  clearUnfinishedSession();
 
-  const sock = makeWASocket({
+  const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authFolder);
+  sock = makeWASocket({
     auth: state,
     printQRInTerminal: false,
     browser: ['RX', 'Chrome', '120.0'],
@@ -345,16 +488,24 @@ async function start() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      currentQr = qr;
+
       console.log('\nScan this QR code with WhatsApp on your phone:\n');
       qrcode.generate(qr, { small: true });
+      console.log(
+        `\nPrefer a bigger code? Open http://127.0.0.1:${CONFIG.helperPort}/qr\n`,
+      );
     }
 
     if (connection === 'open') {
+      isConnected = true;
       console.log('Connected to WhatsApp.');
       console.log(`Forwarding events to ${CONFIG.flaskUrl}`);
     }
 
     if (connection === 'close') {
+      isConnected = false;
+
       const status = lastDisconnect?.error?.output?.statusCode;
 
       if (status === DisconnectReason.loggedOut) {
@@ -363,6 +514,10 @@ async function start() {
         );
         process.exit(1);
       }
+
+      // A session that was never finished cannot be resumed, so
+      // clear it instead of reconnecting into the same broken state.
+      clearUnfinishedSession();
 
       if (!stopping) {
         console.log(`Disconnected (${status}). Reconnecting shortly...`);
@@ -386,6 +541,8 @@ async function start() {
     }
     process.exit(0);
   });
+
+  startHelperServer();
 }
 
 start().catch((error) => {

@@ -72,6 +72,7 @@ class Settings:
     wa_shared_secret: str
     wa_owner_phone: str
     wa_sidecar_url: str
+    wa_helper_url: str
 
     # --- Movies ---
     tmdb_api_key: str
@@ -140,7 +141,10 @@ def load_settings() -> Settings:
         telegram_owner_id=_env("TELEGRAM_OWNER_ID", ""),
         wa_shared_secret=_env("WA_SHARED_SECRET", ""),
         wa_owner_phone=_env("WA_OWNER_PHONE", ""),
-        wa_sidecar_url=_env("WA_SIDECAR_URL", "http://127.0.0.1:8787"),
+        # Where the sidecar sends its events to: the Flask app.
+        wa_sidecar_url=_env("WA_SIDECAR_URL", "http://127.0.0.1:5000"),
+        # Where the app reads the login QR from: the sidecar helper.
+        wa_helper_url=_env("WA_HELPER_URL", "http://127.0.0.1:8787"),
         tmdb_api_key=_env("TMDB_API_KEY", ""),
         watch_region=_env("WATCH_REGION", "IN"),
         db_path=db_path,

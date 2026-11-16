@@ -14,7 +14,7 @@ from sqlalchemy import select
 from config import settings
 from database.database import init_db, session_scope
 from models import Message
-from routes import chat, telegram, voice, whatsapp
+from routes import chat, qr, telegram, voice, whatsapp
 from services import memory
 
 app = Flask(__name__)
@@ -23,6 +23,7 @@ app.register_blueprint(chat.bp)
 app.register_blueprint(voice.bp)
 app.register_blueprint(whatsapp.bp)
 app.register_blueprint(telegram.bp)
+app.register_blueprint(qr.bp)
 
 # Create the tables on import, not only when run as a script, so the
 # schema exists however the app is started.
