@@ -4,7 +4,7 @@
 
 Runs two processes:
 
-  * the Flask app        (web UI, chat, movies, WhatsApp intake)
+  * the Flask app        (web UI, chat, WhatsApp intake)
   * the WhatsApp sidecar (only if node and the sidecar are installed)
 
 The Telegram bot is no longer part of this suite. Press Ctrl+C to

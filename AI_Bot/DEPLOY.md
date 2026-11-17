@@ -153,8 +153,6 @@ curl -k https://your-domain.example/health
 In the browser:
 
 - `/` redirects to `/login` when signed out
-- `/movie?q=Nosferatu` shows a direct download link
-- `/download?q=Interstellar` explains that no legal download exists
 - `/messages` shows the alerts panel
 - Send a WhatsApp message from another phone, delete it, and confirm the
   alert with the original text appears on `/messages`

@@ -14,14 +14,13 @@ from sqlalchemy import func, select
 from config import settings
 from database.database import init_db, session_scope
 from models import Alert, Message
-from routes import alerts, auth, chat, movies, qr, voice, whatsapp
+from routes import alerts, auth, chat, qr, voice, whatsapp
 from services import memory
 
 app = Flask(__name__)
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(alerts.bp)
-app.register_blueprint(movies.bp)
 app.register_blueprint(chat.bp)
 app.register_blueprint(voice.bp)
 app.register_blueprint(whatsapp.bp)

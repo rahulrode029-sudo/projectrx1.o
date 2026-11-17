@@ -5,7 +5,7 @@ import pytest
 from config import settings
 
 
-PAGES = ("/", "/messages", "/movies", "/movie?q=Nosferatu", "/qr", "/qr.svg")
+PAGES = ("/", "/messages", "/qr", "/qr.svg")
 
 
 @pytest.mark.parametrize("path", PAGES)
