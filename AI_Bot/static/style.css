@@ -334,6 +334,18 @@ code {
     transform: scale(.95);
 }
 
+.icon-btn.danger {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+
+.icon-btn.danger:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: var(--danger-soft);
+}
+
 .menu-btn {
     display: none;
 }
@@ -570,6 +582,35 @@ code {
 .empty-icon .icon {
     width: 22px;
     height: 22px;
+}
+
+/* Flash messages */
+
+.flash-stack {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.flash {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 15px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.flash.success {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.flash.error {
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 /* =====================================================
@@ -998,6 +1039,41 @@ code {
     margin-top: 0;
 }
 
+.add-contact-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.add-contact-form input {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+.add-contact-form input:focus {
+    border-color: var(--accent);
+}
+
+.add-contact-form input[name="jid"] {
+    grid-column: 1 / -1;
+}
+
+.add-contact-form button {
+    grid-column: 1 / -1;
+}
+
 .contact-list {
     list-style: none;
     margin: 0;
@@ -1008,8 +1084,16 @@ code {
     overflow-y: auto;
 }
 
+.contact-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .contact-item {
     display: flex;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: 10px;
     padding: 9px 10px;

@@ -10,6 +10,19 @@
 
 {% block content %}
 
+{% with flashes = get_flashed_messages(with_categories=true) %}
+    {% if flashes %}
+        <div class="flash-stack">
+            {% for category, message in flashes %}
+                <div class="flash {{ category }}">
+                    <svg class="icon"><use href="#i-{{ 'check' if category == 'success' else 'info' }}"/></svg>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
 <section class="card alerts-card">
 
     <div class="card-head">
@@ -79,20 +92,34 @@
             <span class="pill">{{ contacts | length }}</span>
         </div>
 
+        <form class="add-contact-form" method="post" action="/contacts/add">
+            <input type="text" name="name" placeholder="Name (optional)" aria-label="Contact name">
+            <input type="text" name="phone" placeholder="Phone number" aria-label="Phone number">
+            <input type="text" name="jid" placeholder="JID (optional)" aria-label="WhatsApp JID">
+            <button type="submit" class="btn primary small">Add contact</button>
+        </form>
+
         {% if not contacts %}
             <div class="empty-state compact">
-                <div><h3>No contacts yet</h3><p>They appear once a message arrives.</p></div>
+                <div><h3>No contacts yet</h3><p>Add one above, or they appear when a message arrives.</p></div>
             </div>
         {% else %}
             <ul class="contact-list">
                 {% for contact in contacts %}
-                    <li>
+                    <li class="contact-row">
                         <a class="contact-item{% if query == contact.label %} active{% endif %}"
                            href="/messages?contact={{ contact.label | urlencode }}">
                             <span class="avatar">{{ contact.label[:1] | upper }}</span>
                             <span class="contact-name">{{ contact.label }}</span>
                             <span class="mode-badge">{{ contact.mode }}</span>
                         </a>
+                        <form method="post" action="/contacts/{{ contact.id }}/delete"
+                              data-confirm="Delete {{ contact.label }} and all its stored messages? This cannot be undone.">
+                            <button type="submit" class="icon-btn danger" title="Delete contact"
+                                    aria-label="Delete {{ contact.label }}">
+                                <svg class="icon"><use href="#i-trash"/></svg>
+                            </button>
+                        </form>
                     </li>
                 {% endfor %}
             </ul>

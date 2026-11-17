@@ -173,6 +173,18 @@
     });
 
     // -----------------------------------------------------
+    // Confirm destructive actions
+    // -----------------------------------------------------
+
+    document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+            if (!window.confirm(form.dataset.confirm)) {
+                event.preventDefault();
+            }
+        });
+    });
+
+    // -----------------------------------------------------
     // Show / hide password on the login page
     // -----------------------------------------------------
 

@@ -15,7 +15,9 @@ archive. It has these features only:
   Replies are spoken back.
 - Messages page: shows the saved WhatsApp archive and an Activity panel
   with alerts. When a contact deletes a message, an alert shows what
-  it said. Nothing is sent to Telegram or email.
+  it said. Contacts can be added manually by name or phone number, or
+  removed with the delete button (which also removes their stored
+  messages). Nothing is sent to Telegram or email.
 - Link WhatsApp page: scan the QR code with the phone you want to
   archive, or enter a phone number to get a pairing code. Use a spare
   SIM because cloud servers can be flagged by WhatsApp. The link is
