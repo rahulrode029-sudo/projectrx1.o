@@ -600,10 +600,18 @@ async function startSocket() {
       const status = lastDisconnect?.error?.output?.statusCode;
 
       if (status === DisconnectReason.loggedOut) {
-        console.error(
-          'Logged out. Delete the auth folder and scan the QR again.',
-        );
-        process.exit(1);
+        // A rejected login must not take the sidecar down for good.
+        // Start over with a clean session and a fresh QR/code.
+        console.log('Logged out. Clearing the session and starting over.');
+        fs.rmSync(CONFIG.authFolder, { recursive: true, force: true });
+        fs.mkdirSync(CONFIG.authFolder, { recursive: true });
+        currentPairingCode = null;
+
+        if (!stopping) {
+          setTimeout(() => startSocket(), CONFIG.reconnectDelay);
+        }
+
+        return;
       }
 
       // Preserve the auth folder here. Only a previous process's

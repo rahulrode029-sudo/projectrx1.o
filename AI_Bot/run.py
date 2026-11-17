@@ -97,6 +97,7 @@ def main():
 
     processes = []
     names = {}
+    restarters = {}
 
     for name, starter in (
         ("the web app", start_flask),
@@ -113,6 +114,7 @@ def main():
         if process is not None:
             processes.append(process)
             names[process.pid] = name
+            restarters[process.pid] = starter
 
         time.sleep(1)
 
@@ -123,16 +125,31 @@ def main():
 
         while True:
 
-            for process in processes:
+            for index, process in enumerate(processes):
 
                 code = process.poll()
 
-                if code is not None and process.pid in names:
-                    print(
-                        f"WARNING: {names[process.pid]} exited with code "
-                        f"{code}. Everything else is still running."
-                    )
-                    del names[process.pid]
+                if code is None or process.pid not in names:
+                    continue
+
+                name = names.pop(process.pid)
+                starter = restarters.pop(process.pid, None)
+
+                print(
+                    f"WARNING: {name} exited with code {code}. " 
+                    "Restarting it."
+                )
+
+                try:
+                    replacement = starter()
+                except Exception as error:
+                    print(f"could not restart {name}: {error}")
+                    continue
+
+                if replacement is not None:
+                    processes[index] = replacement
+                    names[replacement.pid] = name
+                    restarters[replacement.pid] = starter
 
             time.sleep(2)
 
