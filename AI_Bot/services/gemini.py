@@ -16,6 +16,71 @@ _client = None
 # so we stop paying for a doomed request on every call.
 _search_available = True
 
+# The last model that actually answered. It moves to the front of the
+# queue so one overloaded model does not slow down every later request.
+_working_model = None
+
+
+def _candidate_models():
+    """Build the model queue, with the last known good one first."""
+
+    models = list(settings.gemini_fallback_models)
+
+    if settings.gemini_chat_model in models:
+        models.remove(settings.gemini_chat_model)
+
+    models.insert(0, settings.gemini_chat_model)
+
+    if _working_model and _working_model in models:
+        models.remove(_working_model)
+        models.insert(0, _working_model)
+
+    return models
+
+
+def _is_overloaded(error):
+    """True for a temporary 'try another model' style failure."""
+
+    message = str(error)
+
+    return any(
+        marker in message
+        for marker in (
+            "503",
+            "UNAVAILABLE",
+            "high demand",
+            "overload",
+            "429",
+            "RESOURCE_EXHAUSTED",
+        )
+    )
+
+
+def _generate(prompt, config):
+    """Generate with the first model that is responsive right now."""
+
+    global _working_model
+
+    last_error = None
+
+    for model in _candidate_models():
+        try:
+            response = get_client().models.generate_content(
+                model=model,
+                contents=prompt,
+                config=config,
+            )
+            _working_model = model
+            return response
+
+        except Exception as error:
+            last_error = error
+
+            if not _is_overloaded(error):
+                raise
+
+    raise last_error
+
 
 def get_client():
     """Return the shared Gemini client, building it on first use.
@@ -46,13 +111,7 @@ def ask(prompt, system=None):
 
     config = {"system_instruction": system} if system else None
 
-    response = get_client().models.generate_content(
-        model=settings.gemini_chat_model,
-        contents=prompt,
-        config=config,
-    )
-
-    return response.text
+    return _generate(prompt, config).text
 
 
 def ask_with_search(prompt, system=None):
@@ -78,13 +137,7 @@ def ask_with_search(prompt, system=None):
 
         try:
 
-            response = get_client().models.generate_content(
-                model=settings.gemini_chat_model,
-                contents=prompt,
-                config=config,
-            )
-
-            return response.text
+            return _generate(prompt, config).text
 
         except Exception as error:
 

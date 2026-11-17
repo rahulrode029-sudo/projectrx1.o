@@ -53,6 +53,11 @@ const CONFIG = {
 
 let stopping = false;
 let sock = null;
+// A half finished session left by a previous *process* has to go, but
+// one that belongs to this process must survive a reconnect: the
+// pairing code is tied to the keys in that auth folder, so wiping it
+// invalidates the code the user is typing into their phone.
+let sessionChecked = false;
 
 // The latest login QR, kept so the helper page can show it.
 let currentQr = null;
@@ -537,7 +542,10 @@ async function startSocket() {
     process.exit(1);
   }
 
-  clearUnfinishedSession();
+  if (!sessionChecked) {
+    clearUnfinishedSession();
+    sessionChecked = true;
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authFolder);
 
@@ -586,11 +594,9 @@ async function startSocket() {
     if (connection === 'close') {
       isConnected = false;
 
-      // The pairing code is tied to the socket that asked for it, so
-      // it is useless once that socket is gone. A fresh one is
-      // requested when the next QR arrives.
-      currentPairingCode = null;
-
+      // Keep the code on screen while reconnecting. The keys that
+      // back it live in the auth folder, which is now preserved, so
+      // the same code stays usable and the user can keep entering it.
       const status = lastDisconnect?.error?.output?.statusCode;
 
       if (status === DisconnectReason.loggedOut) {
@@ -600,10 +606,8 @@ async function startSocket() {
         process.exit(1);
       }
 
-      // A session that was never finished cannot be resumed, so
-      // clear it instead of reconnecting into the same broken state.
-      clearUnfinishedSession();
-
+      // Preserve the auth folder here. Only a previous process's
+      // abandoned session is cleared, at startup.
       if (!stopping) {
         console.log(`Disconnected (${status}). Reconnecting shortly...`);
         setTimeout(() => startSocket(), CONFIG.reconnectDelay);

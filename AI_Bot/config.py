@@ -62,6 +62,7 @@ class Settings:
     # --- AI ---
     gemini_api_key: str
     gemini_chat_model: str
+    gemini_fallback_models: tuple[str, ...]
     gemini_live_model: str
 
     # --- Telegram ---
@@ -135,6 +136,17 @@ def load_settings() -> Settings:
     return Settings(
         gemini_api_key=_env("Gemini_API_KEY", ""),
         gemini_chat_model=_env("GEMINI_CHAT_MODEL", "gemini-3.6-flash"),
+        # Flash models are frequently overloaded (503). Try the next one
+        # in line instead of failing the user's request.
+        gemini_fallback_models=tuple(
+            model.strip()
+            for model in _env(
+                "GEMINI_FALLBACK_MODELS",
+                "gemini-3.5-flash-lite,gemini-3.1-flash-lite,"
+                "gemini-3.6-flash,gemini-3.5-flash",
+            ).split(",")
+            if model.strip()
+        ),
         gemini_live_model=_env(
             "GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"
         ),
