@@ -8,6 +8,7 @@ import datetime
 
 from config import settings
 from services import gemini
+from services.app_guide import APP_GUIDE, LANGUAGE_RULE
 
 VOICE_SYSTEM_PROMPT = """
 You are RX, a personal voice bot.
@@ -29,9 +30,9 @@ You are a helpful personal AI assistant.
 Speak naturally and clearly.
 Give direct and useful answers.
 Keep spoken responses reasonably concise.
-If the user speaks Marathi, Hindi, or English, respond in the same
-language.
-"""
+When explaining how to use this application, describe the steps
+briefly since the answer will be spoken aloud.
+""" + LANGUAGE_RULE + APP_GUIDE
 
 
 def create_voice_token() -> str:

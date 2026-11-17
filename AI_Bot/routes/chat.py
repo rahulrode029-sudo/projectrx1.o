@@ -3,11 +3,12 @@
 from flask import Blueprint, jsonify, request
 
 from services import gemini
+from services.app_guide import APP_GUIDE, LANGUAGE_RULE
 
 bp = Blueprint("chat", __name__)
 
 SYSTEM_PROMPT = """
-You are a helpful personal AI assistant.
+You are RX, a helpful personal AI assistant.
 
 Your responsibilities:
 - Understand the user's question before answering.
@@ -15,10 +16,9 @@ Your responsibilities:
 - Explain difficult topics in simple language.
 - For technical questions, provide practical examples.
 - Keep answers concise unless the user asks for details.
-- If the user asks for Marathi, Hindi, or English, respond in that language.
 - Do not invent information when you are unsure.
 - Be respectful and professional.
-"""
+""" + LANGUAGE_RULE + APP_GUIDE
 
 
 @bp.route("/chat", methods=["POST"])
