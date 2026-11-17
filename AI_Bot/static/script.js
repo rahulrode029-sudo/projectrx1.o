@@ -13,17 +13,49 @@ function appendMessage(className, label, text) {
 
     const chatBox = document.getElementById("chat-box");
 
+    // The starter card is only shown while the conversation is empty.
+    const empty = chatBox.querySelector(".chat-empty");
+
+    if (empty) {
+        empty.remove();
+    }
+
     const wrapper = document.createElement("div");
     wrapper.className = "message " + className;
 
-    const strong = document.createElement("strong");
-    strong.textContent = label;
+    const avatar = document.createElement("span");
+    avatar.className = "msg-avatar";
+    avatar.textContent = className === "user" ? "Y" : "R";
 
-    const paragraph = document.createElement("p");
-    paragraph.textContent = text;
+    const body = document.createElement("div");
+    body.className = "msg-body";
 
-    wrapper.appendChild(strong);
-    wrapper.appendChild(paragraph);
+    const meta = document.createElement("div");
+    meta.className = "msg-meta";
+
+    const name = document.createElement("span");
+    name.className = "msg-name";
+    name.textContent = label;
+
+    const time = document.createElement("span");
+    time.className = "msg-time";
+    time.textContent = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+
+    meta.appendChild(name);
+    meta.appendChild(time);
+
+    const bubble = document.createElement("div");
+    bubble.className = "msg-bubble";
+    bubble.textContent = text;
+
+    body.appendChild(meta);
+    body.appendChild(bubble);
+
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(body);
 
     chatBox.appendChild(wrapper);
 
@@ -32,9 +64,51 @@ function appendMessage(className, label, text) {
 }
 
 
+function showTyping() {
+
+    const chatBox = document.getElementById("chat-box");
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "message bot typing";
+    wrapper.id = "typing-indicator";
+
+    for (let i = 0; i < 3; i++) {
+        wrapper.appendChild(document.createElement("span"));
+    }
+
+    chatBox.appendChild(wrapper);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+}
+
+
+function hideTyping() {
+
+    const indicator = document.getElementById("typing-indicator");
+
+    if (indicator) {
+        indicator.remove();
+    }
+
+}
+
+
+function setSending(sending) {
+
+    const sendBtn = document.getElementById("send-btn");
+
+    if (sendBtn) {
+        sendBtn.disabled = sending;
+    }
+
+}
+
+
 // =====================================================
 // CHAT MODE
 // =====================================================
+
+let sending = false;
 
 async function sendMessage() {
 
@@ -42,13 +116,18 @@ async function sendMessage() {
 
     const message = input.value.trim();
 
-    if (!message) {
+    if (!message || sending) {
         return;
     }
+
+    sending = true;
+    setSending(true);
 
     appendMessage("user", "You:", message);
 
     input.value = "";
+
+    showTyping();
 
     try {
 
@@ -84,21 +163,36 @@ async function sendMessage() {
             error && error.message ? error.message : "Something went wrong."
         );
 
+    } finally {
+
+        hideTyping();
+        sending = false;
+        setSending(false);
+        input.focus();
+
     }
 }
 
 
-// Press Enter to send
-document.getElementById("message").addEventListener(
+// Press Enter or click Send
+const messageInput = document.getElementById("message");
+const sendBtn = document.getElementById("send-btn");
+
+messageInput.addEventListener(
     "keydown",
     function(event) {
 
         if (event.key === "Enter") {
+            event.preventDefault();
             sendMessage();
         }
 
     }
 );
+
+if (sendBtn) {
+    sendBtn.addEventListener("click", sendMessage);
+}
 
 
 // =====================================================
@@ -133,9 +227,20 @@ const voiceStatus = document.getElementById("voice-status");
 // MODE SWITCHING
 // =====================================================
 
+function syncModeTabs(voiceVisible) {
+
+    chatMode.classList.toggle("active", !voiceVisible);
+    voiceMode.classList.toggle("active", voiceVisible);
+    chatMode.setAttribute("aria-selected", String(!voiceVisible));
+    voiceMode.setAttribute("aria-selected", String(voiceVisible));
+
+}
+
+
 chatMode.addEventListener("click", () => {
 
     voicePanel.style.display = "none";
+    syncModeTabs(false);
 
 });
 
@@ -143,6 +248,7 @@ chatMode.addEventListener("click", () => {
 voiceMode.addEventListener("click", () => {
 
     voicePanel.style.display = "block";
+    syncModeTabs(true);
 
 });
 

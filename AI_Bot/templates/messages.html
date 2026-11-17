@@ -1,49 +1,146 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-    <title>Messages — AI Bot</title>
+{% block title %}Messages — RX{% endblock %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+{% block heading %}Messages{% endblock %}
 
-<body>
+{% block subtitle %}
+    <p class="page-subtitle">Your WhatsApp archive and deletion alerts.</p>
+{% endblock %}
 
-    <div class="topbar">
-        <a href="/">← Back to chat</a>
-        <h1>Messages</h1>
-        <a href="/logout">Sign out</a>
-    </div>
+{% block content %}
 
-    <section class="alerts-panel">
+<section class="card alerts-card">
 
-        <div class="alerts-heading">
-            <h2>Alerts{% if unread %} <span class="unread">{{ unread }} new</span>{% endif %}</h2>
+    <div class="card-head">
+        <div class="card-title">
+            <span class="title-icon accent"><svg class="icon"><use href="#i-bell"/></svg></span>
+            <div>
+                <h2>Activity</h2>
+                <p>Alerts appear here — nothing is sent to Telegram or email.</p>
+            </div>
+        </div>
+
+        <div class="card-actions">
             {% if unread %}
+                <span class="pill danger">{{ unread }} new</span>
                 <form method="post" action="/alerts/seen-all">
-                    <button type="submit" class="small">Mark all seen</button>
+                    <button type="submit" class="btn ghost small">
+                        <svg class="icon"><use href="#i-check"/></svg> Mark all seen
+                    </button>
                 </form>
             {% endif %}
         </div>
+    </div>
 
-        {% if not alerts %}
-            <p class="empty">No alerts yet.</p>
-        {% else %}
-            <ul class="alert-list">
-                {% for item in alerts %}
-                    <li class="alert-row{% if not item.seen %} unread{% endif %}">
+    {% if not alerts %}
+        <div class="empty-state compact">
+            <span class="empty-icon"><svg class="icon"><use href="#i-bell"/></svg></span>
+            <div>
+                <h3>No alerts yet</h3>
+                <p>New messages and deletions will show up here.</p>
+            </div>
+        </div>
+    {% else %}
+        <ul class="alert-list">
+            {% for item in alerts %}
+                {% set alert_icon = "i-trash" if item.kind == "deleted" else ("i-info" if item.kind == "summary" else "i-chat") %}
+                {% set alert_tone = "danger" if item.kind == "deleted" else ("accent" if item.kind == "summary" else "success") %}
+                <li class="alert-row{% if not item.seen %} unread{% endif %}">
+                    <span class="title-icon {{ alert_tone }}"><svg class="icon"><use href="#{{ alert_icon }}"/></svg></span>
+                    <div class="alert-content">
                         <div class="alert-meta">
                             <strong>{{ item.title }}</strong>
-                            <span>{{ item.time }}</span>
-                            {% if not item.seen %}
-                                <form method="post" action="/alerts/{{ item.id }}/seen">
-                                    <button type="submit" class="small">Seen</button>
-                                </form>
-                            {% endif %}
+                            <span class="muted">{{ item.time }}</span>
                         </div>
                         <p class="alert-body">{{ item.body }}</p>
+                    </div>
+                    {% if not item.seen %}
+                        <form method="post" action="/alerts/{{ item.id }}/seen">
+                            <button type="submit" class="btn ghost small" title="Mark as seen">Seen</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+</section>
+
+<div class="messages-grid">
+
+    <aside class="card contacts-card">
+
+        <div class="card-head">
+            <div class="card-title">
+                <span class="title-icon accent"><svg class="icon"><use href="#i-user"/></svg></span>
+                <div><h2>Contacts</h2></div>
+            </div>
+            <span class="pill">{{ contacts | length }}</span>
+        </div>
+
+        {% if not contacts %}
+            <div class="empty-state compact">
+                <div><h3>No contacts yet</h3><p>They appear once a message arrives.</p></div>
+            </div>
+        {% else %}
+            <ul class="contact-list">
+                {% for contact in contacts %}
+                    <li>
+                        <a class="contact-item{% if query == contact.label %} active{% endif %}"
+                           href="/messages?contact={{ contact.label | urlencode }}">
+                            <span class="avatar">{{ contact.label[:1] | upper }}</span>
+                            <span class="contact-name">{{ contact.label }}</span>
+                            <span class="mode-badge">{{ contact.mode }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+    </aside>
+
+    <section class="card messages-card">
+
+        <form class="search-form" method="get" action="/messages">
+            <svg class="icon"><use href="#i-search"/></svg>
+            <input
+                type="text"
+                name="contact"
+                placeholder="Search by contact name…"
+                value="{{ query }}"
+                aria-label="Search contacts"
+            >
+            <button type="submit" class="btn primary small">Filter</button>
+            {% if query %}
+                <a class="clear-link" href="/messages">Clear</a>
+            {% endif %}
+        </form>
+
+        {% if not messages %}
+            <div class="empty-state">
+                <span class="empty-icon"><svg class="icon"><use href="#i-messages"/></svg></span>
+                <div>
+                    <h3>Nothing captured yet</h3>
+                    <p>Messages appear here as soon as they arrive.</p>
+                </div>
+            </div>
+        {% else %}
+            <ul class="message-list">
+                {% for message in messages %}
+                    <li class="message-row{% if message.is_deleted %} deleted{% endif %}">
+                        <div class="meta">
+                            <span class="avatar small">{{ message.contact[:1] | upper }}</span>
+                            <strong>{{ message.contact }}</strong>
+                            <span class="muted">{{ message.sent_at }}</span>
+                            {% if message.is_deleted %}
+                                <span class="pill danger">deleted</span>
+                            {% endif %}
+                        </div>
+                        {% if message.summary %}
+                            <p class="summary">{{ message.summary }}</p>
+                        {% endif %}
+                        <p class="raw">{{ message.body }}</p>
                     </li>
                 {% endfor %}
             </ul>
@@ -51,69 +148,6 @@
 
     </section>
 
-    <div class="messages-layout">
+</div>
 
-        <aside class="contacts-panel">
-
-            <h2>Contacts</h2>
-
-            {% if not contacts %}
-                <p class="empty">No contacts yet.</p>
-            {% else %}
-                <ul class="contact-list">
-                    {% for contact in contacts %}
-                        <li>
-                            <a href="/messages?contact={{ contact.label | urlencode }}">
-                                {{ contact.label }}
-                            </a>
-                            <span class="mode">{{ contact.mode }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-        </aside>
-
-        <main class="messages-panel">
-
-            <form class="search-form" method="get" action="/messages">
-                <input
-                    type="text"
-                    name="contact"
-                    placeholder="Search by contact name..."
-                    value="{{ query }}"
-                >
-                <button type="submit">Filter</button>
-                {% if query %}
-                    <a class="clear" href="/messages">Clear</a>
-                {% endif %}
-            </form>
-
-            {% if not messages %}
-                <p class="empty">Nothing captured yet.</p>
-            {% else %}
-                <ul class="message-list">
-                    {% for message in messages %}
-                        <li class="message-row{% if message.is_deleted %} deleted{% endif %}">
-                            <div class="meta">
-                                <strong>{{ message.contact }}</strong>
-                                <span>{{ message.sent_at }}</span>
-                                {% if message.is_deleted %}
-                                    <span class="badge">deleted</span>
-                                {% endif %}
-                            </div>
-                            {% if message.summary %}
-                                <p class="summary">{{ message.summary }}</p>
-                            {% endif %}
-                            <p class="raw">{{ message.body }}</p>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-        </main>
-
-    </div>
-
-</body>
-</html>
+{% endblock %}

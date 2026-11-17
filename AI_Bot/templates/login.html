@@ -1,40 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-    <title>Sign in - RX</title>
+{% block title %}Sign in — RX{% endblock %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+{% block shell %}
 
-<body class="login-page">
+<div class="auth-page">
 
-    <form class="login-card" method="post" action="/login">
+    <div class="auth-card">
 
-        <h1>RX</h1>
+        <div class="auth-brand">
+            <span class="brand-mark large">R</span>
+            <h1>RX</h1>
+            <p>Your private AI workspace</p>
+        </div>
 
-        <p class="login-hint">Enter the password to continue.</p>
+        <form class="auth-form" method="post" action="/login">
 
-        <input type="hidden" name="next" value="{{ next_url }}">
+            <input type="hidden" name="next" value="{{ next_url }}">
 
-        <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            autocomplete="current-password"
-            autofocus
-            required
-        >
+            <label for="password">Password</label>
 
-        {% if error %}
-            <p class="login-error">{{ error }}</p>
-        {% endif %}
+            <div class="password-field">
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    autofocus
+                    required
+                >
+                <button type="button" id="show-password" class="password-toggle" aria-label="Show password">Show</button>
+            </div>
 
-        <button type="submit">Sign in</button>
+            {% if error %}
+                <p class="login-error" role="alert">
+                    <svg class="icon"><use href="#i-info"/></svg> {{ error }}
+                </p>
+            {% endif %}
 
-    </form>
+            <button type="submit" class="btn primary full">Sign in</button>
 
-</body>
-</html>
+        </form>
+
+        <div class="auth-foot">
+            <svg class="icon"><use href="#i-shield"/></svg>
+            <span>Private — password protected</span>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

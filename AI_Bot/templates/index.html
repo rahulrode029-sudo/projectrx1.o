@@ -1,80 +1,97 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-    <title>AI Bot</title>
+{% block title %}Chat — RX{% endblock %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+{% block heading %}Chat{% endblock %}
 
-<body>
+{% block subtitle %}
+    <p class="page-subtitle">Ask anything. Your AI assistant is ready.</p>
+{% endblock %}
 
-    <div class="mode-buttons">
+{% block top_actions %}
+    <div class="mode-tabs" role="tablist" aria-label="Assistant mode">
+        <button class="mode-tab active" id="chat-mode" type="button" role="tab" aria-selected="true">
+            <svg class="icon"><use href="#i-chat"/></svg><span>Chat</span>
+        </button>
+        <button class="mode-tab" id="voice-mode" type="button" role="tab" aria-selected="false">
+            <svg class="icon"><use href="#i-mic"/></svg><span>Voice</span>
+        </button>
+    </div>
+{% endblock %}
 
-    <button id="chat-mode">
-        💬 Chat
-    </button>
+{% block content_class %}chat-page{% endblock %}
 
-    <button id="voice-mode">
-        🎙 Voice
-    </button>
+{% block content %}
 
-    <a class="messages-link" href="/messages">
-        🗂 Messages
-    </a>
+<div class="chat-card">
 
-    <a class="messages-link" href="/qr">
-        📱 Link WhatsApp
-    </a>
+    <header class="chat-header">
+        <span class="bot-avatar"><svg class="icon"><use href="#i-bot"/></svg></span>
+        <div class="chat-header-text">
+            <strong>RX Assistant</strong>
+            <span><span class="status-dot is-ok"></span> Online</span>
+        </div>
+        <span class="chat-header-label">Gemini powered</span>
+    </header>
 
-    <a class="messages-link" href="/logout">
-        🚪 Sign out
-    </a>
+    <div id="chat-box" aria-live="polite">
 
-</div>
-
-    <div class="chat-container">
-
-        <h1>AI Bot</h1>
-
-        <div id="chat-box"></div>
-
-        <div class="input-area">
-
-            <input
-                type="text"
-                id="message"
-                placeholder="Ask anything..."
-                autocomplete="off"
-            >
-
-            <button onclick="sendMessage()">
-                Send
-            </button>
-
+        <div class="chat-empty">
+            <span class="empty-icon"><svg class="icon"><use href="#i-bot"/></svg></span>
+            <h2>How can I help you today?</h2>
+            <p>Type a question below, or try one of these to get started.</p>
+            <div class="suggestions">
+                <button class="suggestion" type="button">Explain something simply</button>
+                <button class="suggestion" type="button">Draft a short reply</button>
+                <button class="suggestion" type="button">Help me plan my day</button>
+            </div>
         </div>
 
     </div>
 
-    <div id="voice-panel" style="display: none;">
-
-    <button id="start-voice">
-        🎙 Start Voice
-    </button>
-
-    <button id="stop-voice" disabled>
-        ⏹ Stop
-    </button>
-
-    <p id="voice-status">
-        Voice mode is ready.
-    </p>
+    <div class="composer">
+        <input
+            type="text"
+            id="message"
+            placeholder="Ask anything…"
+            autocomplete="off"
+            aria-label="Your message"
+        >
+        <button class="send-btn" id="send-btn" type="button" aria-label="Send message">
+            <svg class="icon"><use href="#i-send"/></svg>
+            <span>Send</span>
+        </button>
+    </div>
 
 </div>
 
-    <script type="importmap">
+<div id="voice-panel" class="voice-card">
+
+    <div class="voice-illustration">
+        <span class="mic-ring"><svg class="icon"><use href="#i-mic"/></svg></span>
+    </div>
+
+    <h2>Talk to RX</h2>
+    <p class="page-subtitle">Press start, then speak naturally. Press stop when you are done.</p>
+
+    <div class="voice-actions">
+        <button id="start-voice" class="btn primary" type="button">
+            <svg class="icon"><use href="#i-mic"/></svg> Start voice
+        </button>
+        <button id="stop-voice" class="btn ghost" type="button" disabled>
+            Stop
+        </button>
+    </div>
+
+    <p class="voice-status" id="voice-status">Voice mode is ready.</p>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script type="importmap">
 {
     "imports": {
         "@google/genai": "https://esm.run/@google/genai"
@@ -82,7 +99,20 @@
 }
 </script>
 
-<script type="module" src="{{ url_for('static', filename='script.js') }}"></script> 
+<script type="module" src="{{ url_for('static', filename='script.js') }}"></script>
 
-</body>
-</html>
+<script>
+    // Suggestion chips fill the composer and fire the same Enter path
+    // the module listener already uses.
+    document.querySelectorAll(".suggestion").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+            var input = document.getElementById("message");
+            input.value = chip.textContent.trim();
+            input.focus();
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        });
+    });
+
+</script>
+
+{% endblock %}

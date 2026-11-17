@@ -1,180 +1,105 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-    <title>Link WhatsApp — RX</title>
+{% block title %}Link WhatsApp — RX{% endblock %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% block heading %}Link WhatsApp{% endblock %}
 
-    <style>
-        body { background: #f5f5f5; }
+{% block subtitle %}
+    <p class="page-subtitle">Connect the spare number once, then leave it linked.</p>
+{% endblock %}
 
-        .qr-wrap {
-            max-width: 680px;
-            margin: 40px auto;
-            background: white;
-            border-radius: 14px;
-            padding: 30px 34px 34px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
+{% block content %}
 
-        .qr-wrap h1 { font-size: 22px; margin-bottom: 4px; }
+<div class="qr-grid">
 
-        .sub { color: #718096; font-size: 14px; margin-top: 0; }
+    <section class="card qr-main">
 
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 18px;
-        }
-
-        .badge.ok   { background: #c6f6d5; color: #276749; }
-        .badge.wait { background: #feebc8; color: #975a16; }
-        .badge.down { background: #fed7d7; color: #9b2c2c; }
-
-        .qr-frame {
-            display: inline-block;
-            padding: 14px;
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            margin: 4px 0 18px;
-        }
-
-        .qr-frame img { display: block; width: 320px; height: 320px; }
-
-        .placeholder {
-            width: 348px;
-            height: 348px;
-            margin: 4px 0 18px;
-            border: 2px dashed #cbd5e0;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            color: #a0aec0;
-            font-size: 14px;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
-        .steps { text-align: left; display: inline-block; margin: 6px 0 4px; }
-        .steps li { margin-bottom: 9px; line-height: 1.5; }
-
-        .panel {
-            border-top: 1px solid #e2e8f0;
-            margin-top: 26px;
-            padding-top: 24px;
-        }
-
-        .panel h2 { font-size: 17px; margin: 0 0 4px; }
-
-        .pairing input {
-            padding: 11px; border: 1px solid #cbd5e0; border-radius: 6px;
-            width: 230px; font-size: 15px;
-        }
-        .pairing button { padding: 11px 20px; font-size: 15px; background: #4a5568; color: white; }
-
-        .code {
-            font-family: Consolas, "Courier New", monospace;
-            font-size: 36px;
-            letter-spacing: 10px;
-            font-weight: bold;
-            color: #2d3748;
-            background: #edf2f7;
-            padding: 16px 22px;
-            border-radius: 10px;
-            display: inline-block;
-            margin: 6px 0 14px;
-            cursor: pointer;
-            user-select: all;
-        }
-
-        .hint { color: #718096; font-size: 13px; line-height: 1.6; }
-
-        .status { font-size: 14px; margin-top: 12px; min-height: 20px; }
-        .good { color: #276749; }
-        .bad  { color: #c53030; }
-
-        code {
-            background: #edf2f7; padding: 2px 6px; border-radius: 4px;
-            font-size: 13px;
-        }
-    </style>
-</head>
-
-<body>
-
-<div class="qr-wrap">
-
-    <h1>Link your WhatsApp</h1>
-    <p class="sub">Do this once. After that the bot stays linked and reconnects on its own.</p>
-
-    <div id="badge" class="badge wait">Checking the sidecar...</div>
-
-    <div id="qr-area">
-        {% if qr %}
-            <div class="qr-frame">
-                <img id="qr-image" src="{{ url_for('qr.qr_svg') }}"
-                     alt="WhatsApp login QR code">
+        <div class="card-head">
+            <div class="card-title">
+                <span class="title-icon accent"><svg class="icon"><use href="#i-link"/></svg></span>
+                <div>
+                    <h2>Scan the QR code</h2>
+                    <p>Use the phone number you want to archive.</p>
+                </div>
             </div>
-        {% else %}
-            <div class="placeholder" id="placeholder">
-                {% if sidecar_down %}
-                    The WhatsApp sidecar is not running.<br><br>
-                    Start the suite with <code>python run.py</code>
-                    and reopen this page.
-                {% else %}
-                    Waiting for the sidecar to produce a QR code...
-                {% endif %}
+            <span id="badge" class="badge wait">Checking the sidecar…</span>
+        </div>
+
+        <div id="qr-area">
+            {% if qr %}
+                <div class="qr-frame">
+                    <img id="qr-image" src="{{ url_for('qr.qr_svg') }}" alt="WhatsApp login QR code">
+                </div>
+            {% else %}
+                <div class="placeholder" id="placeholder">
+                    <svg class="icon"><use href="#i-link"/></svg>
+                    {% if sidecar_down %}
+                        <strong>The WhatsApp sidecar is not running.</strong>
+                        <span>Start it with <code>python run.py</code> and reopen this page.</span>
+                    {% else %}
+                        <strong>Waiting for a QR code…</strong>
+                        <span>The sidecar is starting. This page updates on its own.</span>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <ol class="steps" id="steps" {% if not qr %}style="display:none"{% endif %}>
+            <li>Open WhatsApp on the phone you want to archive.</li>
+            <li>Go to <strong>Settings</strong> → <strong>Linked devices</strong> → <strong>Link a Device</strong>.</li>
+            <li>Point the camera at the code above.</li>
+        </ol>
+
+    </section>
+
+    <section class="card qr-side">
+
+        <div class="card-head">
+            <div class="card-title">
+                <span class="title-icon accent"><svg class="icon"><use href="#i-info"/></svg></span>
+                <div>
+                    <h2>Or use a pairing code</h2>
+                    <p>Handy when scanning from this screen is awkward.</p>
+                </div>
             </div>
-        {% endif %}
-    </div>
+        </div>
 
-    <ol class="steps" id="steps" {% if not qr %}style="display:none"{% endif %}>
-        <li>Open WhatsApp on the phone you want to archive.</li>
-        <li>Go to <strong>Settings</strong> &rarr; <strong>Linked devices</strong> &rarr; <strong>Link a Device</strong>.</li>
-        <li>Point the camera at the code above.</li>
-    </ol>
+        <div class="pairing">
 
-    <div class="panel pairing">
+            {% if pairing_code %}
+                <div class="code" id="pairing-code" title="Click to copy">{{ pairing_code }}</div>
+            {% endif %}
 
-        <h2>Or use a pairing code</h2>
+            <form id="pairing-form">
+                <input type="tel" id="phone" placeholder="Number with country code" value="91" aria-label="Phone number">
+                <button type="submit" class="btn primary">Get code</button>
+            </form>
 
-        <p class="hint">
-            Better if you cannot scan a code from this screen. On the phone
-            choose <strong>Link with phone number instead</strong>, enter
-            the number, then enter the code. This code does not expire.
-        </p>
+            <p class="status" id="pairing-result"></p>
 
-        {% if pairing_code %}
-            <div class="code" id="pairing-code" title="Click to copy">{{ pairing_code }}</div>
-        {% endif %}
+            <div class="notice">
+                <svg class="icon"><use href="#i-info"/></svg>
+                <p>
+                    On the phone choose <strong>Link with phone number instead</strong>,
+                    enter the number, then type the eight-character code here.
+                    Use a spare SIM — cloud IPs can be flagged by WhatsApp.
+                </p>
+            </div>
 
-        <form id="pairing-form">
-            <input type="tel" id="phone" placeholder="Number with country code" value="91">
-            <button type="submit">Get code</button>
-        </form>
+            <p class="hint">
+                The session is saved on the server and survives restarts.
+                Alerts stay on this website; nothing is sent to Telegram.
+            </p>
 
-        <p class="status" id="pairing-result"></p>
+        </div>
 
-    </div>
-
-    <div class="panel">
-        <p class="hint">
-            <strong>After it links</strong>, send <code>/start</code> to
-            <code>@sahilr_ai_assistant_bot</code>. That is how the bot learns
-            where to send your notifications.
-        </p>
-    </div>
+    </section>
 
 </div>
+
+{% endblock %}
+
+{% block scripts %}
 
 <script>
     (function () {
@@ -229,7 +154,7 @@
             var result = document.getElementById("pairing-result");
             var phone = document.getElementById("phone").value.trim();
 
-            result.textContent = "Asking the sidecar...";
+            result.textContent = "Asking the sidecar…";
             result.className = "status";
 
             fetch("{{ url_for('qr.pairing') }}", {
@@ -255,7 +180,7 @@
                     box.className = "code";
                     box.id = "pairing-code";
                     box.title = "Click to copy";
-                    form.parentNode.insertBefore(box, result);
+                    form.parentNode.insertBefore(box, form);
                 }
 
                 box.textContent = data.pairingCode;
@@ -265,21 +190,7 @@
                 result.className = "status bad";
             });
         });
-
-        // Click a pairing code to copy it.
-        document.addEventListener("click", function (event) {
-            if (event.target.id !== "pairing-code") {
-                return;
-            }
-
-            var text = event.target.textContent.trim();
-
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text);
-            }
-        });
     })();
 </script>
 
-</body>
-</html>
+{% endblock %}
