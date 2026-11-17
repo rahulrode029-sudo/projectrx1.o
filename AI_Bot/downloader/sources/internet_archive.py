@@ -112,6 +112,7 @@ class InternetArchiveSource(MovieSource):
     """Direct download links for public domain and archived films."""
 
     name = "internet_archive"
+    kinds = ("download",)
 
     def resolve(self, movie: dict) -> list[MovieOffer]:
 

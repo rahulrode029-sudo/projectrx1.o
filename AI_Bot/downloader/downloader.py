@@ -9,29 +9,49 @@ from downloader.sources import base
 from downloader.sources.base import MovieOffer, sort_offers
 
 
-def find_offers(movie: dict) -> list[MovieOffer]:
-    """Every offer we can find for a movie, best first.
+def find_offers(movie: dict, kinds=None) -> list[MovieOffer]:
+    """Offers for a movie, best first.
 
     A source that fails is skipped rather than breaking the whole
     lookup, so one dead provider never hides the others.
+
+    `kinds` narrows the lookup to sources that can produce those kinds
+    of offer. A direct download request then takes about four seconds
+    instead of waiting on every streaming provider.
     """
 
     offers: list[MovieOffer] = []
+
+    wanted = set(kinds) if kinds else None
 
     for source in base.all_sources():
 
         try:
 
+            if wanted and source.kinds and not wanted.intersection(source.kinds):
+                continue
+
             if not source.can_handle(movie):
                 continue
 
-            offers.extend(source.resolve(movie))
+            resolved = source.resolve(movie)
+
+            if wanted:
+                resolved = [offer for offer in resolved if offer.kind in wanted]
+
+            offers.extend(resolved)
 
         except Exception as error:
 
             print(f"[{source.name}] lookup failed: {error}")
 
     return sort_offers(dedupe(offers))
+
+
+def find_downloads(movie: dict) -> list[MovieOffer]:
+    """Direct, legal download links only."""
+
+    return find_offers(movie, kinds=("download",))
 
 
 def dedupe(offers: list[MovieOffer]) -> list[MovieOffer]:

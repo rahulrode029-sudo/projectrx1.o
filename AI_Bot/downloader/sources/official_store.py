@@ -9,6 +9,7 @@ class OfficialStoreSource(MovieSource):
     """Permanent purchase and rental options."""
 
     name = "official_store"
+    kinds = ("rent", "buy")
 
     def resolve(self, movie: dict) -> list[MovieOffer]:
 

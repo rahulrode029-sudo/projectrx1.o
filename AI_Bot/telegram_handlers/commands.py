@@ -15,12 +15,17 @@ from services import whatsapp as whatsapp_service
 
 HELP_TEXT = """🎬 RX — your AI and movie assistant
 
-Movies
-/movie <title>      Details, rating, cast, director
-/recommend [mood]   Suggestions, e.g. "scary" or "funny"
-/similar <title>    Movies like this one
-/watch <title>      Where to stream it
-/download <title>   Free and download options
+Movies - free downloads first
+/movie <title>      Details + free download link
+/download <title>   Direct, legal download links
+/recommend [mood]   Suggestions, each with a download link
+/similar <title>    Like this one, with download links
+/watch <title>      Free streaming options
+
+Just type it - no command needed:
+  download Interstellar
+  Interstellar download link
+  where to watch Interstellar
 
 WhatsApp archive
 /contacts           Everyone who has written to you

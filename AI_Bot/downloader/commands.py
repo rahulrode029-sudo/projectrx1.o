@@ -3,7 +3,15 @@
 These functions return plain text that the Telegram handler sends.
 Keeping them free of Telegram imports means they can be reused by
 the web UI later.
+
+The point of this bot is getting a film: direct, legal download links
+come first, then free streaming. Pirate and camrip sources are never
+used -- they break constantly and can get the bot and its accounts
+banned.
 """
+
+import re
+from urllib.parse import quote
 
 from downloader import downloader, search
 
@@ -59,6 +67,64 @@ KIND_LABELS = {
     "buy": "💳 BUY",
 }
 
+# Plain language a user might type instead of a command. Checked before
+# the message is handed to Gemini so a download request always lands
+# here rather than getting a chat answer.
+DOWNLOAD_PATTERNS = (
+    re.compile(
+        r"^\s*(?:please\s+)?(?:i\s+want\s+to\s+)?download\s+"
+        r"(?:(?:the\s+)?movie\s+)?(.+?)\s*$",
+        re.I,
+    ),
+    re.compile(r"^\s*(.+?)\s+download\s+link\s*$", re.I),
+    re.compile(r"^\s*(.+?)\s+download\s*$", re.I),
+    re.compile(r"^\s*(?:link|download\s+link)\s+for\s+(.+?)\s*$", re.I),
+)
+
+WATCH_PATTERNS = (
+    re.compile(
+        r"^\s*(?:where\s+(?:(?:can\s+i\s+)|to\s+)?(?:watch|see)|watch)\s+"
+        r"(?:(?:the\s+)?movie\s+)?(.+?)\s*$",
+        re.I,
+    ),
+)
+
+# Chat words that mean a short message is a question, not a film title.
+CHAT_MARKERS = {
+    "hi", "hello", "hey", "thanks", "thank", "please", "help", "ok", "okay",
+    "yes", "no", "how", "what", "why", "who", "when", "where", "which",
+    "can", "could", "would", "should", "do", "does", "did", "is", "are",
+    "was", "were", "tell", "give", "show", "want", "need", "i", "you",
+    "my", "me", "we", "our", "your", "and", "or", "but", "sorry", "good",
+    "bad", "morning", "evening", "night", "bye", "movie", "film", "song",
+    "weather", "time", "date", "news", "translate", "joke", "story",
+}
+
+
+def looks_like_movie_title(text: str) -> bool:
+    """Conservative check for a bare title like 'Interstellar'.
+
+    A typed movie name should get a download link without the user
+    having to remember a command. Anything that looks like a question
+    or ordinary chat is left for Gemini instead.
+    """
+
+    text = (text or "").strip()
+
+    if not text or len(text) > 70 or "?" in text or "@" in text:
+        return False
+
+    words = text.split()
+
+    if not 1 <= len(words) <= 6:
+        return False
+
+    if any(word.lower().strip(".,!") in CHAT_MARKERS for word in words):
+        return False
+
+    # Titles are normally capitalised; lowercase phrases are usually chat.
+    return any(word[:1].isupper() for word in words)
+
 
 def _vote(value):
     return f"{value:.1f}" if value else "?"
@@ -68,6 +134,33 @@ def _year(movie):
     date = movie.get("release_date") or ""
 
     return date[:4] if date else "?"
+
+
+def download_search_url(title: str) -> str:
+    """An Internet Archive search for free copies of a title.
+
+    Used where resolving an actual file for every film would be too
+    slow (recommendation lists). The link is instant and always legal.
+    """
+
+    query = quote(f'collection:feature_films AND title:"{title}"')
+
+    return f"https://archive.org/search?query={query}"
+
+
+def text_request(text: str, patterns) -> str | None:
+    """Return the title in a plain-language request, or None."""
+
+    for pattern in patterns:
+        match = pattern.match(text or "")
+
+        if match:
+            title = match.group(1).strip(" ?.!")
+
+            if title:
+                return title
+
+    return None
 
 
 def find_movie(query: str):
@@ -125,7 +218,7 @@ def movie_card(details: dict) -> str:
     ]
 
     if director:
-        lines.append(f"  🎥 Director: {director}")
+        lines.append(f"  🎬 Director: {director}")
 
     if cast:
         lines.append(f"  🎭 Cast: {', '.join(cast)}")
@@ -145,42 +238,60 @@ def movie_card(details: dict) -> str:
     return "\n".join(lines)
 
 
-def format_offers(title: str, offers: list) -> str:
-    """Render the watch and download options."""
+def format_downloads(title: str, downloads: list) -> str:
+    """Render direct download links, the main purpose of the bot."""
 
-    if not offers:
-        return (
-            f"📥 {title}\n\n"
-            "No free or download options found for this title.\n"
-            "Try /watch to see paid options too."
-        )
+    lines = [f"⬇ {title} - free download", ""]
 
-    lines = [f"📥 {title} — watch & download", ""]
-
-    current_kind = None
-
-    for index, offer in enumerate(offers, start=1):
-
-        if offer.kind != current_kind:
-
-            current_kind = offer.kind
-
-            lines.append("")
-            lines.append(KIND_LABELS.get(offer.kind, offer.kind.upper()))
-            lines.append("")
-
-        note = f" — {offer.note}" if offer.note else ""
+    for index, offer in enumerate(downloads, start=1):
+        note = f" ({offer.note})" if offer.note else ""
 
         lines.append(f"{index}. {offer.provider}{note}")
+        lines.append(f"   {offer.url}")
 
-        if offer.url:
-            lines.append(f"   {offer.url}")
+    lines.append("")
+    lines.append("Public domain or Creative Commons files. No signup needed.")
 
     return "\n".join(lines).strip()
 
 
+def _free_streaming_lines(details: dict) -> list[str]:
+    """Legal free ways to watch, for titles with no downloadable file."""
+
+    lines = []
+
+    try:
+        providers = search.providers_for_region(details["id"])
+    except Exception as error:
+        print(f"Provider lookup failed: {error}")
+        providers = {}
+
+    entries = []
+
+    for kind in ("free", "ads"):
+        for entry in providers.get(kind) or []:
+            name = entry.get("provider_name")
+
+            if name and name not in entries:
+                entries.append(name)
+
+    lines.append("")
+
+    if entries:
+        lines.append("▶ Free to watch in India: " + ", ".join(entries))
+    else:
+        lines.append("No free streaming listed in India.")
+
+    link = providers.get("link")
+
+    if link:
+        lines.append("All providers: " + link)
+
+    return lines
+
+
 def handle_movie(query: str) -> str:
-    """The /movie command."""
+    """The /movie command: details plus a direct download link first."""
 
     if not query:
         return "Usage: /movie <title>\nExample: /movie Interstellar"
@@ -188,13 +299,28 @@ def handle_movie(query: str) -> str:
     match, details = find_movie(query)
 
     if match is None:
-        return f"🔍 No movie found for '{query}'."
+        return f"🎬 No movie found for '{query}'."
 
-    return movie_card(details)
+    title = details.get("title") or query
+
+    downloads = downloader.find_downloads(details)
+
+    card = movie_card(details)
+
+    if downloads:
+        return card + "\n\n" + format_downloads(title, downloads)
+
+    # Most new releases have no legal free download. Say so plainly,
+    # then still give the free streaming options and an Archive search.
+    text = card + f"\n\n⬇ No free legal download found for {title}."
+    text += "\nPirate sites are illegal and break constantly - not linked here."
+    text += "\n\nTry: " + download_search_url(title)
+
+    return text + "\n" + "\n".join(_free_streaming_lines(details))
 
 
 def handle_watch(query: str) -> str:
-    """The /watch command — where the title can be streamed."""
+    """The /watch command - where the title can be streamed."""
 
     if not query:
         return "Usage: /watch <title>"
@@ -202,13 +328,11 @@ def handle_watch(query: str) -> str:
     match, details = find_movie(query)
 
     if match is None:
-        return f"🔍 No movie found for '{query}'."
+        return f"🎬 No movie found for '{query}'."
 
     providers = search.providers_for_region(details["id"])
 
-    region = "IN"
-
-    lines = [f"📺 {details.get('title')} — where to watch", ""]
+    lines = [f"🎬 {details.get('title')} - where to watch", ""]
 
     found = False
 
@@ -228,7 +352,6 @@ def handle_watch(query: str) -> str:
         found = True
 
         lines.append(f"{label}")
-
         lines.append(
             "  " + ", ".join(e.get("provider_name", "") for e in entries)
         )
@@ -242,11 +365,14 @@ def handle_watch(query: str) -> str:
     if link:
         lines.append(f"Details: {link}")
 
+    lines.append("")
+    lines.append("Want a free download instead? Send /download <title>.")
+
     return "\n".join(lines).strip()
 
 
 def handle_download(query: str) -> str:
-    """The /download command — every way to get the film."""
+    """The /download command - direct, legal download links first."""
 
     if not query:
         return "Usage: /download <title>"
@@ -254,19 +380,20 @@ def handle_download(query: str) -> str:
     match, details = find_movie(query)
 
     if match is None:
-        return f"🔍 No movie found for '{query}'."
+        return f"🎬 No movie found for '{query}'."
 
-    offers = downloader.find_offers(details)
+    title = details.get("title") or query
 
-    primary, secondary = downloader.split_offers(offers)
+    downloads = downloader.find_downloads(details)
 
-    text = format_offers(details.get("title", "This movie"), primary)
+    if downloads:
+        text = format_downloads(title, downloads)
+    else:
+        text = f"⬇ {title}\n\nNo free legal download found."
+        text += "\nPirate sites are illegal and break constantly - not linked here."
+        text += "\n\nCheck the free archive: " + download_search_url(title)
 
-    if secondary:
-        text += "\n\nAlso worth checking:"
-
-        for offer in secondary:
-            text += f"\n• {offer.provider} — {offer.url}"
+    text += "\n" + "\n".join(_free_streaming_lines(details))
 
     return text
 
@@ -290,14 +417,13 @@ def _genres_for_mood(mood: str) -> list[int]:
 
 
 def handle_recommend(mood: str = "") -> str:
-    """The /recommend command."""
+    """The /recommend command - every suggestion gets a download link."""
 
     genres = _genres_for_mood(mood)
 
     if genres:
         movies = search.discover_by_genre(genres)
         heading = f"🎬 Because you want something {mood.strip()}"
-
     else:
         movies = search.trending_movies("week")
         heading = "🎬 Trending this week"
@@ -308,22 +434,15 @@ def handle_recommend(mood: str = "") -> str:
     lines = [heading, ""]
 
     for movie in movies[:8]:
-
         title = movie.get("title", "?")
-
         year = _year(movie)
-
         vote = _vote(movie.get("vote_average"))
 
-        overview = (movie.get("overview") or "").strip()
-
         lines.append(f"• {title} ({year})  ⭐ {vote}")
-
-        if overview:
-            lines.append(f"  {overview[:150]}")
+        lines.append(f"  ⬇ Download: {download_search_url(title)}")
 
     lines.append("")
-    lines.append("Want one of these? Send /movie <title> for links.")
+    lines.append("Send /download <title> for a direct file link when one exists.")
 
     return "\n".join(lines)
 
@@ -337,7 +456,7 @@ def handle_similar(query: str) -> str:
     match, details = find_movie(query)
 
     if match is None:
-        return f"🔍 No movie found for '{query}'."
+        return f"🎬 No movie found for '{query}'."
 
     similar = search.similar_movies(details["id"])
 
@@ -347,11 +466,14 @@ def handle_similar(query: str) -> str:
     lines = [f"🎬 Movies like {details.get('title')}", ""]
 
     for movie in similar[:8]:
+        title = movie.get("title", "?")
+
         lines.append(
-            f"• {movie.get('title')} ({_year(movie)})  ⭐ {_vote(movie.get('vote_average'))}"
+            f"• {title} ({_year(movie)})  ⭐ {_vote(movie.get('vote_average'))}"
         )
+        lines.append(f"  ⬇ Download: {download_search_url(title)}")
 
     lines.append("")
-    lines.append("Send /movie <title> for links to any of these.")
+    lines.append("Send /download <title> for a direct file link when one exists.")
 
     return "\n".join(lines)

@@ -90,6 +90,7 @@ class FreePlatformSource(MovieSource):
     """Links to the free platforms that carry the title."""
 
     name = "free_platforms"
+    kinds = ("free", "ads")
 
     def resolve(self, movie: dict) -> list[MovieOffer]:
 

@@ -14,6 +14,7 @@ class TmdbProviderSource(MovieSource):
     """Where the title streams free or with ads."""
 
     name = "tmdb"
+    kinds = ("free", "ads")
 
     def resolve(self, movie: dict) -> list[MovieOffer]:
 

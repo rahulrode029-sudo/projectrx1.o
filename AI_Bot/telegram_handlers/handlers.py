@@ -3,6 +3,7 @@
 from telegram.ext import CallbackQueryHandler, MessageHandler, filters
 
 from database.database import session_scope
+from downloader import commands as movie_commands
 from services import gemini, memory
 from services import telegram as telegram_service
 
@@ -22,7 +23,7 @@ SYSTEM_PROMPT = (
 
 
 async def handle_text(update, context):
-    """Plain text messages are answered by Gemini."""
+    """Route movie requests to the movie tools, everything else to Gemini."""
 
     message = update.effective_message
 
@@ -30,6 +31,46 @@ async def handle_text(update, context):
 
     if not text.strip():
         return
+
+    # "download Interstellar", "Interstellar download link" and
+    # "where to watch Interstellar" are movie requests, not chat.
+    title = movie_commands.text_request(text, movie_commands.DOWNLOAD_PATTERNS)
+
+    if title:
+        try:
+            answer = movie_commands.handle_download(title)
+        except Exception as error:
+            print(f"Download request failed: {error}")
+            answer = "Could not look that up right now."
+
+        await telegram_service.reply(message, answer)
+        return
+
+    title = movie_commands.text_request(text, movie_commands.WATCH_PATTERNS)
+
+    if title:
+        try:
+            answer = movie_commands.handle_watch(title)
+        except Exception as error:
+            print(f"Watch request failed: {error}")
+            answer = "Could not look that up right now."
+
+        await telegram_service.reply(message, answer)
+        return
+
+    # A bare film title like "Interstellar" also gets the movie card
+    # and its download link. If TMDB finds nothing, fall through to
+    # Gemini so ordinary short messages still get a chat answer.
+    if movie_commands.looks_like_movie_title(text):
+        try:
+            answer = movie_commands.handle_movie(text.strip())
+        except Exception as error:
+            print(f"Title lookup failed: {error}")
+            answer = ""
+
+        if answer and "No movie found" not in answer:
+            await telegram_service.reply(message, answer)
+            return
 
     try:
         answer = gemini.ask(text, system=SYSTEM_PROMPT)

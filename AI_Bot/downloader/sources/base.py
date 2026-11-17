@@ -41,6 +41,11 @@ class MovieSource:
 
     name = "source"
 
+    # Offer kinds this source produces. None means "ask everything".
+    # Sources that only yield download links can be selected directly,
+    # which keeps a download request from waiting on every provider.
+    kinds = None
+
     def can_handle(self, movie: dict) -> bool:
         """Whether this source can offer anything for this movie."""
 
