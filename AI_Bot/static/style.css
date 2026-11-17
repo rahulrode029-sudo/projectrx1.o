@@ -239,3 +239,165 @@ button {
 .empty {
     color: #a0aec0;
 }
+
+/* =====================================================
+   Login page
+   ===================================================== */
+
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.login-card {
+    width: 360px;
+    max-width: 92%;
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.login-card h1 {
+    margin: 0;
+}
+
+.login-hint {
+    margin: 0;
+    color: #718096;
+    font-size: 14px;
+}
+
+.login-card input[type="password"] {
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+.login-error {
+    margin: 0;
+    color: #c53030;
+    font-size: 14px;
+}
+
+/* =====================================================
+   Alerts panel
+   ===================================================== */
+
+.alerts-panel {
+    max-width: 1100px;
+    margin: 20px auto;
+    padding: 0 15px;
+}
+
+.alerts-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.alerts-heading h2 {
+    font-size: 18px;
+    margin: 0;
+}
+
+.unread {
+    background: #c53030;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 12px;
+}
+
+.alert-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    gap: 10px;
+}
+
+.alert-row {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e0;
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.alert-row.unread {
+    border-left-color: #c53030;
+    background: #fffafa;
+}
+
+.alert-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: #718096;
+}
+
+.alert-meta form {
+    margin-left: auto;
+}
+
+.alert-body {
+    margin: 8px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #2d3748;
+}
+
+button.small {
+    padding: 4px 10px;
+    font-size: 12px;
+    background: #4a5568;
+    color: white;
+}
+
+/* =====================================================
+   Movie pages
+   ===================================================== */
+
+.movie-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+.movie-form {
+    display: flex;
+    gap: 10px;
+}
+
+.movie-form input {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+.movie-actions {
+    margin: 12px 0;
+}
+
+.movie-actions a {
+    color: #4a5568;
+}
+
+.movie-result {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    line-height: 1.5;
+}

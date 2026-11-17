@@ -18,6 +18,9 @@ os.environ.setdefault("Gemini_API_KEY", "test-key")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 os.environ.setdefault("TMDB_API_KEY", "test-key")
 
+os.environ.setdefault("WEB_PASSWORD", "test-password")
+os.environ.setdefault("FLASK_SECRET_KEY", "test-secret-key-for-tests")
+
 import pytest
 
 
@@ -44,8 +47,8 @@ def session():
 
 
 @pytest.fixture
-def client():
-    """A Flask test client."""
+def anon_client():
+    """A Flask test client that is not logged in."""
 
     from app import app
 
@@ -53,6 +56,23 @@ def client():
 
     with app.test_client() as test_client:
         yield test_client
+
+
+@pytest.fixture
+def client(anon_client):
+    """A Flask test client, logged in by default."""
+
+    from config import settings
+
+    response = anon_client.post(
+        "/login",
+        data={"password": settings.web_password},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302, "test login failed"
+
+    return anon_client
 
 
 @pytest.fixture

@@ -9,21 +9,27 @@ Run it as its own process:
 """
 
 from flask import Flask, jsonify, render_template, request
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from config import settings
 from database.database import init_db, session_scope
-from models import Message
-from routes import chat, qr, telegram, voice, whatsapp
+from models import Alert, Message
+from routes import alerts, auth, chat, movies, qr, voice, whatsapp
 from services import memory
 
 app = Flask(__name__)
 
+app.register_blueprint(auth.bp)
+app.register_blueprint(alerts.bp)
+app.register_blueprint(movies.bp)
 app.register_blueprint(chat.bp)
 app.register_blueprint(voice.bp)
 app.register_blueprint(whatsapp.bp)
-app.register_blueprint(telegram.bp)
 app.register_blueprint(qr.bp)
+
+# Every page except /health and /login requires a session. /wa/* keeps
+# its own shared-secret check for the sidecar.
+auth.configure(app)
 
 # Create the tables on import, not only when run as a script, so the
 # schema exists however the app is started.
@@ -87,10 +93,36 @@ def messages_page():
             for row in rows
         ]
 
+        alert_rows = list(
+            session.scalars(
+                select(Alert).order_by(Alert.seen, Alert.created_at.desc()).limit(20)
+            )
+        )
+
+        alerts_data = [
+            {
+                "id": item.id,
+                "kind": item.kind,
+                "title": item.title,
+                "body": item.body,
+                "seen": item.seen,
+                "time": item.created_at.strftime("%d %b %H:%M"),
+            }
+            for item in alert_rows
+        ]
+
+        unread = session.scalar(
+            select(func.count())
+            .select_from(Alert)
+            .where(Alert.seen.is_(False))
+        )
+
     return render_template(
         "messages.html",
         contacts=contact_rows,
         messages=message_rows,
+        alerts=alerts_data,
+        unread=unread,
         query=contact_query,
     )
 
@@ -114,5 +146,13 @@ def health():
 if __name__ == "__main__":
     print(f"Database: {settings.db_path}")
     print(f"Region:   {settings.watch_region}")
+    print(f"Web app:  http://{settings.web_host}:{settings.web_port}")
 
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    if not settings.web_password:
+        print("WEB_PASSWORD is not set - the site will refuse visitors.")
+
+    app.run(
+        host=settings.web_host,
+        port=settings.web_port,
+        debug=settings.web_debug,
+    )

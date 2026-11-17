@@ -57,6 +57,17 @@ def _env(name, default=None, required=False):
     return value
 
 
+def _env_bool(name, default=False):
+    """Read a true/false environment variable."""
+
+    value = (_env(name, "") or "").strip().lower()
+
+    if not value:
+        return default
+
+    return value in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class Settings:
     # --- AI ---
@@ -79,6 +90,13 @@ class Settings:
     # --- Movies ---
     tmdb_api_key: str
     watch_region: str
+
+    # --- Web app ---
+    web_password: str
+    flask_secret_key: str
+    web_host: str
+    web_port: int
+    web_debug: bool
 
     # --- Storage ---
     db_path: Path
@@ -163,6 +181,13 @@ def load_settings() -> Settings:
         wa_helper_url=_env("WA_HELPER_URL", "http://127.0.0.1:8787"),
         tmdb_api_key=_env("TMDB_API_KEY", ""),
         watch_region=_env("WATCH_REGION", "IN"),
+        # Password for the public web UI. Refuse to serve the site with
+        # an empty password so it can never be left open by accident.
+        web_password=_env("WEB_PASSWORD", ""),
+        flask_secret_key=_env("FLASK_SECRET_KEY", ""),
+        web_host=_env("WEB_HOST", "127.0.0.1"),
+        web_port=int(_env("WEB_PORT", "5000")),
+        web_debug=_env_bool("WEB_DEBUG", False),
         db_path=db_path,
         media_dir=media_dir,
     )
@@ -171,3 +196,15 @@ def load_settings() -> Settings:
 settings = load_settings()
 
 _warn_about_malformed_env()
+
+if not settings.web_password:
+    print(
+        "WARNING: WEB_PASSWORD is not set. The web UI will refuse to "
+        "start until it is. Add it to .env and restart."
+    )
+
+if not settings.flask_secret_key:
+    print(
+        "WARNING: FLASK_SECRET_KEY is not set. Session cookies will "
+        "not survive a restart. Add it to .env and restart."
+    )

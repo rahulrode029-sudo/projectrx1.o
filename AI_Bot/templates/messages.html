@@ -14,7 +14,43 @@
     <div class="topbar">
         <a href="/">← Back to chat</a>
         <h1>Messages</h1>
+        <a href="/movies">Movies</a>
+        <a href="/logout">Sign out</a>
     </div>
+
+    <section class="alerts-panel">
+
+        <div class="alerts-heading">
+            <h2>Alerts{% if unread %} <span class="unread">{{ unread }} new</span>{% endif %}</h2>
+            {% if unread %}
+                <form method="post" action="/alerts/seen-all">
+                    <button type="submit" class="small">Mark all seen</button>
+                </form>
+            {% endif %}
+        </div>
+
+        {% if not alerts %}
+            <p class="empty">No alerts yet.</p>
+        {% else %}
+            <ul class="alert-list">
+                {% for item in alerts %}
+                    <li class="alert-row{% if not item.seen %} unread{% endif %}">
+                        <div class="alert-meta">
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.time }}</span>
+                            {% if not item.seen %}
+                                <form method="post" action="/alerts/{{ item.id }}/seen">
+                                    <button type="submit" class="small">Seen</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                        <p class="alert-body">{{ item.body }}</p>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+    </section>
 
     <div class="messages-layout">
 

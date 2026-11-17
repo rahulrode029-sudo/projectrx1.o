@@ -1,14 +1,14 @@
-"""Start the whole suite in one terminal.
+"""Start the web-only suite in one terminal.
 
     python run.py
 
-Runs three processes:
+Runs two processes:
 
-  * the Flask app        (web UI, chat, voice, WhatsApp intake)
-  * the Telegram bot     (commands and answers)
+  * the Flask app        (web UI, chat, movies, WhatsApp intake)
   * the WhatsApp sidecar (only if node and the sidecar are installed)
 
-Press Ctrl+C to stop everything.
+The Telegram bot is no longer part of this suite. Press Ctrl+C to
+stop everything.
 """
 
 import os
@@ -63,12 +63,6 @@ def start_flask():
     return subprocess.Popen([PYTHON, "app.py"], cwd=BASE_DIR)
 
 
-def start_telegram():
-    print("starting the Telegram bot")
-
-    return subprocess.Popen([PYTHON, "telegram_bot.py"], cwd=BASE_DIR)
-
-
 def start_sidecar():
     """Start the WhatsApp sidecar, if it can be started."""
 
@@ -101,7 +95,6 @@ def main():
 
     for name, starter in (
         ("the web app", start_flask),
-        ("the Telegram bot", start_telegram),
         ("the WhatsApp sidecar", start_sidecar),
     ):
 

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{{ mode }} - RX</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="topbar">
+        <a href="/">&#8592; Back to chat</a>
+        <h1>{{ mode }}</h1>
+        <a href="/messages">Messages</a>
+        <a href="/logout">Sign out</a>
+    </div>
+
+    <main class="movie-page">
+
+        <form class="movie-form" method="get" action="/download">
+            <input
+                type="text"
+                name="q"
+                placeholder="Movie name, e.g. Nosferatu"
+                value="{{ query }}"
+                autofocus
+                required
+            >
+            <button type="submit">Find download</button>
+        </form>
+
+        <div class="movie-actions">
+            <a href="/movies">Search again</a>
+        </div>
+
+        {% if result %}
+            <pre class="movie-result">{{ result }}</pre>
+        {% else %}
+            <p class="empty">
+                Type a movie name above. Only free legal sources are
+                linked - no pirate sites or camrips.
+            </p>
+        {% endif %}
+
+    </main>
+
+</body>
+</html>

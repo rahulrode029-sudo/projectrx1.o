@@ -4,19 +4,19 @@ Three responsibilities:
 
   1. capture every inbound message the moment it arrives
   2. flag a message as deleted when its revoke event comes in
-  3. tell the owner about it, using the per-contact privacy mode
+  3. write an alert to the database for the web page, using the
+     per-contact privacy mode
 
 The sidecar sends events in; this module decides what happens.
+Notifications are web-only now - there is no Telegram bot.
 """
 
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
-from config import settings
 from database.database import session_scope
-from models import Contact, Message, User
+from models import Alert, Contact, Message, User
 from services import gemini, memory, spam_detector
 
 
@@ -55,64 +55,61 @@ def remember_owner(session, chat_id: int, username=None, display_name=None) -> N
 # NOTIFICATION
 # =====================================================
 
-async def notify_owner(text: str, reply_markup=None) -> bool:
-    """Send a message to the owner on Telegram.
+def store_alert(
+    kind: str,
+    title: str,
+    body: str,
+    contact_id: int | None = None,
+    wa_message_id: str | None = None,
+) -> int | None:
+    """Write an alert for the Messages page.
 
-    A fresh Bot is created for each call rather than a shared one:
-    this runs inside whatever event loop the caller has, and a Bot
-    whose HTTP client was bound to a previous loop cannot be reused.
+    Kept synchronous: callers wrap it in `await` only because the old
+    Telegram notifier was async. No network call is needed now.
     """
 
-    if not settings.has_telegram:
-        print("TELEGRAM_BOT_TOKEN is not set, skipping notification.")
-        return False
-
-    with session_scope() as session:
-        chat_id = owner_chat_id(session)
-
-    if not chat_id:
-        print("No owner chat id yet, skipping notification.")
-        return False
-
-    bot = Bot(token=settings.telegram_bot_token)
-
     try:
-        await bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode=None,
-        )
-        return True
+        with session_scope() as session:
+            alert = Alert(
+                kind=kind,
+                title=title or "",
+                body=body or "",
+                contact_id=contact_id,
+                wa_message_id=wa_message_id,
+            )
+            session.add(alert)
+            session.commit()
+
+            return alert.id
 
     except Exception as error:
-        print(f"Could not notify owner: {error}")
-        return False
-
-    finally:
-        try:
-            await bot.shutdown()
-        except Exception:
-            pass
+        print(f"Could not store web alert: {error}")
+        return None
 
 
-def _delete_keyboard(message: Message) -> InlineKeyboardMarkup:
-    """The Show / Ignore buttons under a delete alert."""
+async def notify_web(
+    text: str,
+    kind: str = "message",
+    title: str = "",
+    contact_id: int | None = None,
+    wa_message_id: str | None = None,
+) -> bool:
+    """Async-compatible wrapper used by the event handlers."""
 
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "👁 Show content",
-                    callback_data=f"wa_show:{message.wa_message_id}",
-                ),
-                InlineKeyboardButton(
-                    "🔕 Ignore",
-                    callback_data=f"wa_ignore:{message.wa_message_id}",
-                ),
-            ]
-        ]
-    )
+    # The old alert text started with an emoji and label; keep the
+    # useful part as the body while the title carries the label.
+    body = text
+
+    if "\n\n" in text:
+        title, body = text.split("\n\n", 1)
+
+    return store_alert(
+        kind=kind,
+        title=title,
+        body=body,
+        contact_id=contact_id,
+        wa_message_id=wa_message_id,
+    ) is not None
 
 
 # =====================================================
@@ -180,6 +177,7 @@ def handle_message_event(payload: dict) -> dict:
             "message_id": message.id,
             "mode": mode,
             "contact": label,
+            "contact_id": message.contact_id,
             "body": body,
             "from_me": from_me,
         }
@@ -215,7 +213,13 @@ async def process_message_event(payload: dict) -> dict:
     label = result.get("contact", "someone")
 
     if mode == "full":
-        await notify_owner(f"💬 {label}\n\n{body}")
+        await notify_web(
+            f"💬 {label}\n\n{body}",
+            kind="full",
+            title=label,
+            contact_id=result.get("contact_id"),
+            wa_message_id=payload.get("wa_message_id"),
+        )
         return result
 
     summary = ""
@@ -241,7 +245,13 @@ async def process_message_event(payload: dict) -> dict:
                 memory.set_summary(session, message, summary)
                 session.commit()
 
-    await notify_owner(f"💬 {label}\n\n{summary}")
+    await notify_web(
+        f"💬 {label}\n\n{summary}",
+        kind="summary",
+        title=label,
+        contact_id=result.get("contact_id"),
+        wa_message_id=payload.get("wa_message_id"),
+    )
 
     return result
 
@@ -286,14 +296,16 @@ def handle_revoke_event(payload: dict) -> dict:
             "message_id": message.id,
             "wa_message_id": wa_message_id,
             "contact": label,
+            "contact_id": message.contact_id,
             "notify": should_notify,
+            "mode": preference.notify_mode if preference else "summary",
             "body": message.body or "",
             "summary": message.summary or "",
         }
 
 
 async def process_revoke_event(payload: dict) -> dict:
-    """Flag a deleted message and tell the owner about it."""
+    """Flag a deleted message and raise a web alert with its content."""
 
     result = handle_revoke_event(payload)
 
@@ -305,12 +317,20 @@ async def process_revoke_event(payload: dict) -> dict:
 
     label = result.get("contact", "someone")
 
-    await notify_owner(
-        f"⚠️ {label} deleted a message.\n\n"
-        "Tap Show to see what it said.",
-        reply_markup=_delete_keyboard(
-            Message(wa_message_id=result["wa_message_id"])
-        ),
+    # summary mode keeps the one-line summary; full shows the original
+    # text. Either way the alert itself carries the content, so the
+    # owner does not need to open a second page to see what was deleted.
+    if result.get("mode") == "full":
+        content = result.get("body") or result.get("summary") or "(no text)"
+    else:
+        content = result.get("summary") or result.get("body") or "(no text)"
+
+    await notify_web(
+        f"⚠️ {label} deleted a message.\n\n{content}",
+        kind="deleted",
+        title=f"⚠️ {label} deleted a message",
+        contact_id=result.get("contact_id"),
+        wa_message_id=result.get("wa_message_id"),
     )
 
     return result
