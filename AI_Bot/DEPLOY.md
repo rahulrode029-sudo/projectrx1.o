@@ -1,8 +1,8 @@
 # Deploying RX to a free always-on VM
 
-This deploys the **web app + one WhatsApp sidecar per account**. The
-Telegram bot is not started. Visitors sign in with a username and password;
-the admin creates accounts at `/admin/users`.
+This deploys the **web app + one WhatsApp sidecar per account**. Visitors
+sign in with a username and password; the admin creates accounts at
+`/admin/users`. Alerts stay on the website.
 
 Recommended host: **Oracle Cloud Always Free** (ARM Ampere A1, 4 cores /
 24 GB, free forever). Ubuntu 22.04 or 24.04 works. A Google Cloud e2-micro
@@ -54,24 +54,22 @@ Create `/opt/rx/AI_Bot/.env` from `.env.example` and fill in:
 
 ```ini
 Gemini_API_KEY=...
-TELEGRAM_BOT_TOKEN=          # leave empty: no Telegram bot
-TMDB_API_KEY=                # optional, movies are removed from the UI
 
 WEB_PASSWORD=choose-a-strong-password
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=choose-a-strong-password
-ADMIN_PHONE=919423031182
+ADMIN_PHONE=919876543210
 PUBLIC_BASE_URL=https://your-domain.example
 FLASK_SECRET_KEY=<python3 -c "import secrets; print(secrets.token_hex(32))">
 WEB_HOST=127.0.0.1
 WEB_PORT=5000
 WEB_DEBUG=false
+DISPLAY_TIMEZONE=Asia/Kolkata
 RX_USE_WAITRESS=1
 
 WA_SHARED_SECRET=<generate a long random string>
 WA_PAIRING_PHONE=919423031182   # admin only; users scan their own QR
 FLASK_URL=http://127.0.0.1:5000
-WATCH_REGION=IN
 
 # Forgot-password fallback (fill after your templates are approved)
 MSG91_AUTH_KEY=...

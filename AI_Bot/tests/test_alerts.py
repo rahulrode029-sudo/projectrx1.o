@@ -1,4 +1,4 @@
-"""Web alerts replace the old Telegram delete notifications."""
+"""Delete and message alerts are written for the Messages page."""
 
 import pytest
 

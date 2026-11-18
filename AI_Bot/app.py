@@ -176,17 +176,14 @@ def health():
         {
             "ok": True,
             "gemini": settings.has_gemini,
-            "telegram": settings.has_telegram,
-            "tmdb": settings.has_tmdb,
             "whatsapp_intake": bool(settings.wa_shared_secret),
-            "region": settings.watch_region,
         }
     )
 
 
 if __name__ == "__main__":
     print(f"Database: {settings.db_path}")
-    print(f"Region:   {settings.watch_region}")
+    print(f"Timezone: {settings.display_timezone}")
     print(f"Web app:  http://{settings.web_host}:{settings.web_port}")
 
     if not settings.web_password:

@@ -1,8 +1,7 @@
 """Web notifications.
 
-With no Telegram bot in the deployment, alerts are written here and
-shown on the Messages page instead. `seen` lets the page highlight
-what has arrived since the owner last looked.
+Alerts are written here and shown on the Messages page. `seen` lets
+the page highlight what has arrived since the owner last looked.
 """
 
 from datetime import datetime

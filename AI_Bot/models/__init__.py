@@ -12,7 +12,7 @@ from models.permission import (
     NOTIFY_MODES,
     ContactPreference,
 )
-from models.user import Contact, User
+from models.user import Contact
 from models.web_user import OtpCode, ResetToken, WebUser
 
 __all__ = [
@@ -23,7 +23,6 @@ __all__ = [
     "NOTIFY_MODES",
     "DEFAULT_NOTIFY_MODE",
     "Contact",
-    "User",
     "WebUser",
     "OtpCode",
     "ResetToken",

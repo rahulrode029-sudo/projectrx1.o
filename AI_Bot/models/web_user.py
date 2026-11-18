@@ -1,8 +1,7 @@
 """Web accounts, OTP codes and password reset tokens.
 
-These are separate from the old Telegram `User` model. Every row in the
-archive points at one of these accounts through `owner_id`, which is
-what keeps users from seeing each other's data.
+Every row in the archive points at one of these accounts through
+`owner_id`, which is what keeps users from seeing each other's data.
 """
 
 from datetime import datetime

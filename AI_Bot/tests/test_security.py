@@ -1,7 +1,5 @@
-"""Tests for the safety helpers and the source adapter plumbing."""
+"""Tests for the safety helpers."""
 
-from downloader.sources import base
-from downloader.sources.base import MovieOffer, MovieSource, sort_offers
 from security import file_checker, url_checker
 from services import spam_detector
 
@@ -89,35 +87,3 @@ def test_unsafe_urls_are_reported():
 
     assert unsafe
     assert "127.0.0.1" in unsafe[0][0]
-
-
-# =====================================================
-# SOURCE ADAPTERS
-# =====================================================
-
-def test_offers_sort_free_first():
-    offers = [
-        MovieOffer(kind="buy", provider="Store", url="u"),
-        MovieOffer(kind="download", provider="Archive", url="u"),
-        MovieOffer(kind="free", provider="FreeTV", url="u"),
-        MovieOffer(kind="ads", provider="AdTV", url="u"),
-    ]
-
-    ordered = [offer.kind for offer in sort_offers(offers)]
-
-    assert ordered == ["download", "free", "ads", "buy"]
-
-
-def test_the_registry_has_the_expected_sources():
-    names = {source.name for source in base.all_sources()}
-
-    assert "tmdb" in names
-    assert "internet_archive" in names
-    assert "free_platforms" in names
-    assert "official_store" in names
-
-
-def test_a_source_without_a_title_offers_nothing():
-    from downloader.sources.free_platforms import FreePlatformSource
-
-    assert FreePlatformSource().resolve({"id": 1}) == []

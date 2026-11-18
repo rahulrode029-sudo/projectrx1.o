@@ -122,8 +122,7 @@ def ask_with_search(prompt, system=None):
     fallback is remembered, so the failing request is only made once
     per process instead of on every call.
 
-    Movie features do not depend on this: TMDB already provides
-    authoritative structured data, which is handed to `ask` instead.
+    The chat and alert summaries still work with plain generation.
     """
 
     global _search_available

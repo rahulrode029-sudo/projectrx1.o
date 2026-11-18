@@ -7,8 +7,7 @@ Accounts are read from the database every couple of seconds, so a new
 user created in the admin panel gets their own sidecar (and QR page)
 without restarting this launcher.
 
-The Telegram bot is no longer part of this suite. Press Ctrl+C to stop
-everything.
+Press Ctrl+C to stop everything.
 """
 
 import os

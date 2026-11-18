@@ -8,16 +8,16 @@ Three responsibilities:
      per-contact privacy mode
 
 The sidecar sends events in; this module decides what happens.
-Notifications are web-only now - there is no Telegram bot.
+Alerts stay on the website - nothing is sent to a chat service.
 """
 
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import select
 
 from database.database import session_scope
-from models import Alert, Contact, Message, User
+from models import Alert, Message
 from services import gemini, memory, spam_detector
 from services.tenancy import current_owner_id
 
@@ -44,37 +44,6 @@ def _take_pending_delete(owner_id: int, wa_message_id: str) -> str | None:
     return delete_type if expires_at > time.time() else None
 
 
-def owner_chat_id(session) -> int | None:
-    """The owner's Telegram chat id, learned the first time they write."""
-
-    owner = session.scalar(select(User).where(User.is_owner.is_(True)))
-
-    if owner is None or not owner.platform_id:
-        return None
-
-    try:
-        return int(owner.platform_id)
-    except (TypeError, ValueError):
-        return None
-
-
-def remember_owner(session, chat_id: int, username=None, display_name=None) -> None:
-    """Record the owner's chat id so the app can reach them later."""
-
-    owner = session.scalar(select(User).where(User.is_owner.is_(True)))
-
-    if owner is None:
-        owner = User(is_owner=True)
-        session.add(owner)
-
-    owner.platform = "telegram"
-    owner.platform_id = str(chat_id)
-    owner.username = username
-    owner.display_name = display_name
-
-    session.flush()
-
-
 # =====================================================
 # NOTIFICATION
 # =====================================================
@@ -88,8 +57,8 @@ def store_alert(
 ) -> int | None:
     """Write an alert for the Messages page.
 
-    Kept synchronous: callers wrap it in `await` only because the old
-    Telegram notifier was async. No network call is needed now.
+    Kept synchronous: callers wrap it in `await` only to keep the
+    event-handling interface uniform. No network call is needed now.
     """
 
     try:

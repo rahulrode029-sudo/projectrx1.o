@@ -1,8 +1,8 @@
 """SQLite storage for the bot suite.
 
-SQLite runs in WAL mode because three processes share this file:
-the Flask app, the Telegram bot and the WhatsApp sidecar. WAL lets
-readers and a writer work at the same time instead of blocking.
+SQLite runs in WAL mode because the Flask app and several WhatsApp
+sidecars share this file. WAL lets readers and a writer work at the
+same time instead of blocking.
 """
 
 from pathlib import Path

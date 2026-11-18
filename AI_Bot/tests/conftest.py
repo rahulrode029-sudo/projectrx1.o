@@ -16,8 +16,6 @@ os.environ.setdefault(
 os.environ.setdefault("WA_SHARED_SECRET", "test-shared-secret")
 
 os.environ.setdefault("Gemini_API_KEY", "test-key")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
-os.environ.setdefault("TMDB_API_KEY", "test-key")
 
 os.environ.setdefault("WEB_PASSWORD", "test-password")
 os.environ.setdefault("ADMIN_USERNAME", "admin")

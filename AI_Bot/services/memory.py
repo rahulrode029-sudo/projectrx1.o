@@ -1,7 +1,7 @@
 """Storing, finding and summarising captured messages.
 
-This is the layer that knows what the bot has seen. The WhatsApp
-sidecar calls into it for every event; the Telegram commands query it.
+This is the layer that knows what the app has seen. The WhatsApp
+sidecar calls into it for every event; the web pages query it.
 """
 
 import math
@@ -298,8 +298,7 @@ def all_contacts(session: Session) -> list[Contact]:
 def resolve_contact(session: Session, query: str) -> Contact | None:
     """Find a contact by name, phone number, JID or part of a name.
 
-    Used by the Telegram commands, where the owner types a name
-    rather than an id.
+    Used when the owner types a contact name rather than an id.
     """
 
     if not query:

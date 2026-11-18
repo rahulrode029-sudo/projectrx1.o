@@ -1,1 +1,1 @@
-"""Business logic shared by the Flask app and the Telegram bot."""
+"""Business logic shared by the web routes and the WhatsApp sidecar."""

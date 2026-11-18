@@ -1,207 +1,112 @@
-# RX — AI Bot Suite
+# RX — private WhatsApp archive
 
-A personal AI assistant with two front ends over one shared backend:
+A password-protected website where every user links their own WhatsApp and
+sees only their own archive. Messages are captured the moment they arrive,
+and a deleted message stays visible in red with its original text.
 
-- **Telegram bot** — general AI chat plus a movie engine
-- **WhatsApp sidecar** — archives messages that reach your own account,
-  including ones that are deleted before you get to read them
-
-Everything runs locally on your machine.
+There is no Telegram bot, no email delivery, and no movie pages. Alerts
+appear on this website only.
 
 ---
 
 ## What it does
 
-### Telegram
-
-```
-/start /help
-/movie <title>       Details, rating, cast, director, synopsis
-/recommend [mood]    Suggestions — try "scary", "funny", "space"
-/similar <title>    Movies like this one
-/watch <title>      Where to stream it, by region
-/download <title>   Free, ad-supported and download options
-/search <query>     Ask anything
-
-/contacts           Everyone who has written to you
-/msg <name>         Recent messages, summarised
-/read <name>        The raw text, on request
-/summary <name>     What a contact has been saying
-/deleted            Messages that were deleted
-/mode <name>        full | summary | silent
-```
-
-### The deleted message feature
-
-The WhatsApp sidecar captures every message the moment it arrives. When
-somebody deletes it, WhatsApp sends a *revoke* event that contains no
-content — only the id of the message it refers to. The bot looks that id
-up in its database, flags the row, and tells you:
-
-```
-⚠️ Rahul deleted a message.
-
-[👁 Show content]  [🔕 Ignore]
-```
-
-Tapping **Show** returns the text that was stored before the deletion.
-
-### Privacy modes
-
-Per contact, so you know what a message said without having to read it:
-
-| Mode | What you get |
-|---|---|
-| `summary` (default) | One line: *"Rahul wants to move the 5pm meeting to 6"* |
-| `full` | The message text |
-| `silent` | Nothing, until you ask |
-
-Change it any time with `/mode <name> full|summary|silent`.
+- **Separate account per user.** The admin creates accounts at `/admin/users`;
+  there is no public signup. Each account gets its own WhatsApp session,
+  local helper port, contacts, messages and alerts.
+- **Deleted messages.** When somebody deletes a message, the revoke event
+  flags the stored copy and writes a web alert. The original text stays
+  available in the Messages page.
+- **Assistant.** Ask “how to use this application” in any language and the
+  built-in guide explains the app. It never invents other products.
+- **Voice.** Short-lived tokens are used for the browser voice feature; the
+  API key is never sent to the browser.
+- **Password recovery.** `/forgot-password` sends a one-time reset link and
+  the username to the account's phone — WhatsApp first, MSG91 SMS fallback.
+  Old passwords are never sent.
 
 ---
 
-## Setup
-
-### 1. Python side
+## Run locally
 
 ```powershell
 cd AI_Bot
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
 
-### 2. Keys
+cd whatsapp_sidecar
+npm install
+cd ..
 
-Copy `.env.example` to `.env` and fill it in:
+copy .env.example .env
+# fill in .env: Gemini_API_KEY, FLASK_SECRET_KEY, WA_SHARED_SECRET,
+# ADMIN_PASSWORD, ADMIN_PHONE, PUBLIC_BASE_URL, MSG91_* values
 
-| Key | Where to get it |
-|---|---|
-| `Gemini_API_KEY` | https://aistudio.google.com/apikey |
-| `TELEGRAM_BOT_TOKEN` | Message **@BotFather** on Telegram |
-| `TMDB_API_KEY` | https://www.themoviedb.org/settings/api |
-| `WA_SHARED_SECRET` | Any random string — the sidecar must match it |
-
-```powershell
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-### 3. Run
-
-```powershell
 python run.py
 ```
 
-That starts the web app, the Telegram bot and the WhatsApp sidecar
-together. Ctrl+C stops everything.
+Open **http://127.0.0.1:5000/login**.
 
-Run them separately if you prefer:
+`run.py` starts the web app and one WhatsApp sidecar for every active
+account. A newly created user gets their own sidecar within a couple of
+seconds without restarting the launcher. Ctrl+C stops everything.
 
-```powershell
-python app.py            # web app on http://127.0.0.1:5000
-python telegram_bot.py   # Telegram bot
-```
+### Link WhatsApp
 
-### 4. WhatsApp sidecar
-
-```powershell
-cd whatsapp_sidecar
-npm install
-npm start
-```
-
-`npm install` applies a patch to Baileys automatically. This matters:
-around 2026-07-28 WhatsApp added a `companion_reg_refresh` stage to
-device registration, and no published Baileys release handles it, so
-pairing fails with *"Couldn't link device"* on both the QR and the
-pairing code path. The patch in `patches/` carries the upstream fixes
-until they are released.
-
-If your npm blocks install scripts, approve them once:
-
-```powershell
-npm approve-scripts --allow-scripts-pending
-npm run setup      # applies the patch by hand
-```
-
-The sidecar also asks WhatsApp for the current Web version at startup
-instead of trusting the version bundled with Baileys, which goes stale
-and blocks linking on its own.
-
-Open **http://127.0.0.1:5000/qr** to see the login code large enough
-to scan comfortably. It refreshes itself, so it never expires while
-you are aiming your phone.
-
-On the phone: WhatsApp → **Settings** → **Linked devices** → **Link a
-Device**. Point the camera at the code.
-
-Or use the **pairing code** on the same page: an eight character code
-that does not expire. On the phone choose *Link with phone number
-instead*, enter your number, then type the code. Set
-`WA_PAIRING_PHONE` in `.env` and the code is generated for you
+Open **http://127.0.0.1:5000/qr**. Scan the QR with WhatsApp →
+**Settings → Linked devices → Link a Device**, or use the eight-character
+pairing code. Set `WA_PAIRING_PHONE` in `.env` to generate the admin code
 automatically.
 
-The session is saved in `whatsapp_sidecar/auth/`, so you only do this
-once and it reconnects on its own after a restart.
+`npm install` applies a patch to Baileys automatically. This matters:
+WhatsApp added a `companion_reg_refresh` stage that no published Baileys
+release handles, so pairing fails with *“Couldn't link device”* without the
+patch in `patches/`.
 
-> Use a **spare number** if you can. Baileys is an unofficial WhatsApp
-> client, and using one risks WhatsApp banning the number. A prepaid
-> SIM is cheap insurance.
-
-Once you have sent `/start` to the Telegram bot, the bot learns your
-chat id and can start sending notifications.
+> Use a spare number if you can. Baileys is an unofficial WhatsApp client.
 
 ---
 
-## How it fits together
+## Configuration
 
-```
-   WhatsApp (your phone)
-          |
-          v
-   Node sidecar            captures messages + revoke events
-          |
-          | POST /wa/events
-          v
-   Flask app  <------------- shared SQLite database
-          ^                        ^
-          |                        |
-   Telegram bot              every stored message
-```
+See `.env.example` for every setting. Important ones:
 
-Three processes share one SQLite file, which runs in WAL mode so a
-reader and a writer do not block each other.
+| Setting | Purpose |
+|---|---|
+| `Gemini_API_KEY` | AI replies and summary alerts |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | First account, created on first start |
+| `FLASK_SECRET_KEY` | Signs session cookies |
+| `WA_SHARED_SECRET` | Shared between the web app and the sidecars |
+| `WA_PAIRING_PHONE` | Admin's number for automatic pairing code |
+| `PUBLIC_BASE_URL` | Public HTTPS domain used in reset links |
+| `MSG91_AUTH_KEY`, `MSG91_*_TEMPLATE_ID` | SMS fallback for recovery |
+| `DISPLAY_TIMEZONE` | Time zone shown on the website (stored as UTC) |
+| `RX_USE_WAITRESS` | Set to `1` on the VM |
+
+For a production VM with nginx, HTTPS and systemd, follow **DEPLOY.md**.
+
+---
+
+## Layout
 
 ```
 AI_Bot/
-├── app.py              Flask: web UI, /chat, /voice-token, /wa/*
-├── telegram_bot.py     Telegram polling
-├── run.py              starts everything
-├── config.py           all settings in one place
-├── database/           SQLAlchemy models + SQLite setup
-├── models/             User, Contact, Conversation, Message, Preference
-├── services/           gemini, memory, telegram, whatsapp, spam_detector
-├── downloader/         movie sources and commands
-│   └── sources/        tmdb_free, internet_archive, free_platforms, ...
-├── routes/             chat, voice, whatsapp blueprints
-├── security/           url_checker, file_checker
-├── telegram_handlers/  commands, handlers, moderation
-├── whatsapp_sidecar/   Node + Baileys connector
+├── app.py              Flask: web pages, /chat, /voice-token, /wa/*
+├── run.py              starts the web app + one sidecar per user
+├── config.py           settings from .env
+├── database/           SQLite setup
+├── models/             accounts, contacts, conversations, messages, alerts
+├── routes/             auth, admin, alerts, chat, contacts, qr, recovery, voice, whatsapp
+├── services/           accounts, recovery, memory, gemini, whatsapp, spam_detector, app_guide
+├── security/           URL and file checks
+├── templates/          web pages
+├── static/             styles and browser scripts
+├── whatsapp_sidecar/   Node + Baileys connector, per-user auth folders
+├── deploy/rx.service   production systemd unit
+├── DEPLOY.md           VM deployment guide
 └── tests/              pytest suite
 ```
-
-### Where movie data comes from
-
-- **TMDB** — titles, ratings, cast, release dates, and which provider
-  carries a title. Its watch-provider data is tagged `free`, `ads`,
-  `flatrate`, `rent` and `buy` per country, refreshed daily.
-- **Internet Archive** — real downloadable files, filtered to the
-  `feature_films` collection so trailers and interviews are excluded.
-- **Free platform registry** — MX Player, ZEE5, JioHotstar, SonyLIV,
-  TVF Play, ShemarooMe, Airtel Xstream, Tubi, Plex, YouTube.
-
-Adding another source means adding one file under `downloader/sources/`
-with a `resolve()` method. Nothing else changes.
 
 ---
 
@@ -211,42 +116,21 @@ with a `resolve()` method. Nothing else changes.
 python -m pytest tests -q
 ```
 
-The suite runs against a throwaway database and does not call any
-external API.
+From `whatsapp_sidecar/`:
+
+```powershell
+node --test session_check.test.js
+```
+
+The suite uses a throwaway database and makes no external API calls.
 
 ---
 
-## Notes and limits
+## Notes
 
-- **Google Search grounding needs a billed API key.** On the free tier
-  it returns a quota error, so `services/gemini.py` falls back to plain
-  generation and the movie features use TMDB for current data instead.
-- **The sidecar must be running** to catch a message before it is
-  deleted. If it was offline when the message arrived, the revoke event
-  often will not be replayed.
-- **Telegram messages are capped at 4096 characters.** Long replies are
-  split automatically.
-- The bot never sends your API key to the browser. The voice feature
-  uses a short-lived, single-use token instead.
-
----
-
-## Troubleshooting
-
-**`from telegram import Update` fails** — a folder named `telegram` in
-the project root shadows the installed `python-telegram-bot`. The
-handlers live in `telegram_handlers/` for this reason.
-
-**The sidecar says "not logged in"** — delete `whatsapp_sidecar/auth/`
-and scan the QR again. The sidecar also clears an unfinished session
-by itself, so this only happens if the device was unlinked from the
-phone.
-
-**The QR page says the sidecar is not running** — check that
-`whatsapp_sidecar` is up. `run.py` prints a warning if it exits.
-
-**Telegram bot does not answer** — check the token in `.env` and make
-sure only one instance is polling at a time.
-
-**`/wa/events` returns 401** — `WA_SHARED_SECRET` differs between
-`.env` and the sidecar's environment.
+- The sidecar must be running to catch a message before it is deleted. If it
+  was offline when the message arrived, the revoke event is usually not
+  replayed.
+- Only post-link text and captions are archived. Media files and older
+  history are not.
+- Back up `database/chatbote.db` and `whatsapp_sidecar/auth/` regularly.

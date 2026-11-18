@@ -76,20 +76,12 @@ class Settings:
     gemini_fallback_models: tuple[str, ...]
     gemini_live_model: str
 
-    # --- Telegram ---
-    telegram_bot_token: str
-    telegram_owner_id: str
-
     # --- WhatsApp ---
     wa_shared_secret: str
     wa_owner_phone: str
     wa_pairing_phone: str
     wa_sidecar_url: str
     wa_helper_url: str
-
-    # --- Movies ---
-    tmdb_api_key: str
-    watch_region: str
 
     # --- Web app ---
     web_password: str
@@ -119,13 +111,6 @@ class Settings:
     def has_gemini(self):
         return bool(self.gemini_api_key)
 
-    @property
-    def has_telegram(self):
-        return bool(self.telegram_bot_token)
-
-    @property
-    def has_tmdb(self):
-        return bool(self.tmdb_api_key)
 
 
 def _warn_about_malformed_env():
@@ -141,7 +126,7 @@ def _warn_about_malformed_env():
     for name, value in os.environ.items():
 
         if not name.startswith(
-            ("GEMINI", "TELEGRAM", "TMDB", "WA_", "DB_", "MEDIA_", "ADMIN_", "MSG91_")
+            ("GEMINI", "WA_", "DB_", "MEDIA_", "ADMIN_", "MSG91_")
         ):
             continue
 
@@ -183,8 +168,6 @@ def load_settings() -> Settings:
         gemini_live_model=_env(
             "GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"
         ),
-        telegram_bot_token=_env("TELEGRAM_BOT_TOKEN", ""),
-        telegram_owner_id=_env("TELEGRAM_OWNER_ID", ""),
         wa_shared_secret=_env("WA_SHARED_SECRET", ""),
         wa_owner_phone=_env("WA_OWNER_PHONE", ""),
         # The number the sidecar links to. Digits only, with the
@@ -194,8 +177,6 @@ def load_settings() -> Settings:
         wa_sidecar_url=_env("WA_SIDECAR_URL", "http://127.0.0.1:5000"),
         # Where the app reads the login QR from: the sidecar helper.
         wa_helper_url=_env("WA_HELPER_URL", "http://127.0.0.1:8787"),
-        tmdb_api_key=_env("TMDB_API_KEY", ""),
-        watch_region=_env("WATCH_REGION", "IN"),
         # Password for the public web UI. Refuse to serve the site with
         # an empty password so it can never be left open by accident.
         web_password=_env("WEB_PASSWORD", ""),
