@@ -97,6 +97,8 @@ class Settings:
     web_host: str
     web_port: int
     web_debug: bool
+    # Timestamps are stored in UTC; this is the zone used on the site.
+    display_timezone: str
 
     # --- Accounts and recovery ---
     admin_username: str
@@ -201,6 +203,7 @@ def load_settings() -> Settings:
         web_host=_env("WEB_HOST", "127.0.0.1"),
         web_port=int(_env("WEB_PORT", "5000")),
         web_debug=_env_bool("WEB_DEBUG", False),
+        display_timezone=_env("DISPLAY_TIMEZONE", "Asia/Kolkata"),
         # First admin account. WEB_PASSWORD is kept as a fallback so an
         # existing single-password install upgrades without a downtime.
         admin_username=_env("ADMIN_USERNAME", "admin"),

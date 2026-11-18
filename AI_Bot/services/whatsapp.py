@@ -11,6 +11,7 @@ The sidecar sends events in; this module decides what happens.
 Notifications are web-only now - there is no Telegram bot.
 """
 
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -19,6 +20,28 @@ from database.database import session_scope
 from models import Alert, Contact, Message, User
 from services import gemini, memory, spam_detector
 from services.tenancy import current_owner_id
+
+# A revoke can overtake the message it refers to. Remember those ids for
+# a short while so the message is flagged as soon as it is captured.
+PENDING_MINUTES = 10
+_pending_deletes: dict[int, dict[str, tuple[str, float]]] = {}
+
+
+def _remember_pending_delete(owner_id: int, wa_message_id: str, delete_type: str):
+    bucket = _pending_deletes.setdefault(owner_id, {})
+    bucket[wa_message_id] = (delete_type, time.time() + PENDING_MINUTES * 60)
+
+
+def _take_pending_delete(owner_id: int, wa_message_id: str) -> str | None:
+    bucket = _pending_deletes.get(owner_id, {})
+    entry = bucket.pop(wa_message_id, None)
+
+    if entry is None:
+        return None
+
+    delete_type, expires_at = entry
+
+    return delete_type if expires_at > time.time() else None
 
 
 def owner_chat_id(session) -> int | None:
@@ -164,6 +187,14 @@ def handle_message_event(payload: dict) -> dict:
 
         session.commit()
 
+        # The revoke may have arrived before this message. Apply it now
+        # so the row is never left looking like an ordinary message.
+        pending_delete = _take_pending_delete(current_owner_id(), wa_message_id)
+
+        if pending_delete:
+            memory.mark_deleted(session, wa_message_id, pending_delete)
+            session.commit()
+
         contact = message.contact
 
         mode = "summary"
@@ -182,7 +213,33 @@ def handle_message_event(payload: dict) -> dict:
             "contact_id": message.contact_id,
             "body": body,
             "from_me": from_me,
+            "was_deleted": bool(pending_delete),
         }
+
+
+async def _raise_delete_alert(result: dict) -> None:
+    """Write the web alert for a deleted message."""
+
+    if not result.get("notify", True):
+        return
+
+    label = result.get("contact", "someone")
+
+    # summary mode keeps the one-line summary; full shows the original
+    # text. Either way the alert carries the content so the owner does
+    # not need to open a second page to see what was deleted.
+    if result.get("mode") == "full":
+        content = result.get("body") or result.get("summary") or "(no text)"
+    else:
+        content = result.get("summary") or result.get("body") or "(no text)"
+
+    await notify_web(
+        f"⚠️ {label} deleted a message.\n\n{content}",
+        kind="deleted",
+        title=f"⚠️ {label} deleted a message",
+        contact_id=result.get("contact_id"),
+        wa_message_id=result.get("wa_message_id"),
+    )
 
 
 async def process_message_event(payload: dict) -> dict:
@@ -195,6 +252,18 @@ async def process_message_event(payload: dict) -> dict:
 
     if result.get("from_me"):
         return result
+
+    if result.get("was_deleted"):
+        await _raise_delete_alert(
+            {
+                "contact": result.get("contact", "someone"),
+                "contact_id": result.get("contact_id"),
+                "wa_message_id": payload.get("wa_message_id"),
+                "body": result.get("body") or "",
+                "mode": "full",
+                "notify": True,
+            }
+        )
 
     body = result.get("body") or ""
 
@@ -281,7 +350,15 @@ def handle_revoke_event(payload: dict) -> dict:
         session.commit()
 
         if message is None:
-            return {"ok": False, "reason": "message not found"}
+            # The revoke overtook the message. Apply it when the message
+            # event lands a moment later.
+            _remember_pending_delete(
+                current_owner_id(),
+                wa_message_id,
+                payload.get("delete_type") or "revoke",
+            )
+            print(f"Revoke for {wa_message_id} arrived first; holding it.")
+            return {"ok": False, "reason": "message pending", "pending": True}
 
         contact = message.contact
 
@@ -314,25 +391,6 @@ async def process_revoke_event(payload: dict) -> dict:
     if not result.get("ok"):
         return result
 
-    if not result.get("notify"):
-        return result
-
-    label = result.get("contact", "someone")
-
-    # summary mode keeps the one-line summary; full shows the original
-    # text. Either way the alert itself carries the content, so the
-    # owner does not need to open a second page to see what was deleted.
-    if result.get("mode") == "full":
-        content = result.get("body") or result.get("summary") or "(no text)"
-    else:
-        content = result.get("summary") or result.get("body") or "(no text)"
-
-    await notify_web(
-        f"⚠️ {label} deleted a message.\n\n{content}",
-        kind="deleted",
-        title=f"⚠️ {label} deleted a message",
-        contact_id=result.get("contact_id"),
-        wa_message_id=result.get("wa_message_id"),
-    )
+    await _raise_delete_alert(result)
 
     return result

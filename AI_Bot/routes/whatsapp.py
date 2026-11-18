@@ -100,6 +100,19 @@ def _handle_bulk_delete(payload):
             if message is not None:
                 flagged += 1
 
+                contact = message.contact
+                label = contact.label if contact else "someone"
+                preference = memory.get_preference(session, contact) if contact else None
+
+                if preference is None or preference.notify_deleted:
+                    whatsapp_service.store_alert(
+                        kind="deleted",
+                        title=f"⚠️ {label} deleted a message",
+                        body=message.body or "",
+                        contact_id=message.contact_id,
+                        wa_message_id=wa_message_id,
+                    )
+
     return {"ok": True, "flagged": flagged}
 
 

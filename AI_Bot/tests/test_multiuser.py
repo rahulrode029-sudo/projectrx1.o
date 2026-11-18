@@ -1,6 +1,7 @@
 """Multiple accounts, isolation and phone-based password recovery."""
 
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from urllib.parse import urlparse, parse_qs
@@ -203,6 +204,88 @@ def test_deleted_messages_are_flagged_and_shown_in_red(client, session):
 
     assert "message-row deleted" in html
     assert ">Deleted</span>" in html
+
+
+def test_message_times_are_shown_in_local_timezone(client, session):
+    marker = "TIMEZONE-" + uuid.uuid4().hex[:8]
+
+    with owner_scope(accounts.bootstrap_admin_id()):
+        memory.store_message(
+            session,
+            chat_jid="913322110099@s.whatsapp.net",
+            wa_message_id=marker,
+            body=marker,
+            sender_jid="913322110099@s.whatsapp.net",
+            sender_name="TimezoneCheck",
+            sent_at=datetime(2026, 11, 18, 12, 15, tzinfo=timezone.utc),
+        )
+        session.commit()
+
+    html = client.get("/messages").get_data(as_text=True)
+
+    assert "18 Nov 17:45" in html
+
+
+def test_revoke_arriving_before_message_is_applied(client, session):
+    marker = "EARLY-REVOKE-" + uuid.uuid4().hex[:8]
+    headers = {"X-WA-Secret": settings.wa_shared_secret}
+
+    client.post(
+        "/wa/events",
+        json={"type": "revoke", "key": {"id": marker}, "delete_type": "revoke"},
+        headers=headers,
+    )
+
+    client.post(
+        "/wa/events",
+        json={
+            "type": "message",
+            "chat_jid": "912211009988@s.whatsapp.net",
+            "wa_message_id": marker,
+            "body": "deleted before it arrived",
+            "sender_jid": "912211009988@s.whatsapp.net",
+            "sender_name": "EarlyRevoke",
+        },
+        headers=headers,
+    )
+
+    row = session.scalar(select(Message).where(Message.wa_message_id == marker))
+
+    assert row is not None
+    assert row.is_deleted is True
+    assert session.scalar(
+        select(Alert).where(Alert.wa_message_id == marker, Alert.kind == "deleted")
+    ) is not None
+
+
+def test_delete_for_me_also_raises_an_alert(client, session):
+    marker = "BULK-DELETE-" + uuid.uuid4().hex[:8]
+
+    with owner_scope(accounts.bootstrap_admin_id()):
+        memory.store_message(
+            session,
+            chat_jid="911100998877@s.whatsapp.net",
+            wa_message_id=marker,
+            body="bulk deleted body",
+            sender_jid="911100998877@s.whatsapp.net",
+            sender_name="BulkDelete",
+        )
+        session.commit()
+
+    client.post(
+        "/wa/events",
+        json={"type": "delete", "keys": [{"id": marker}]},
+        headers={"X-WA-Secret": settings.wa_shared_secret},
+    )
+
+    row = session.scalar(select(Message).where(Message.wa_message_id == marker))
+    alert = session.scalar(
+        select(Alert).where(Alert.wa_message_id == marker, Alert.kind == "deleted")
+    )
+
+    assert row.is_deleted is True
+    assert alert is not None
+    assert alert.body == "bulk deleted body"
 
 
 def test_forgot_password_flow_sets_a_new_password(other_client, anon_client, monkeypatch):

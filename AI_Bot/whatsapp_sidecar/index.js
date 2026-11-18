@@ -33,7 +33,7 @@ import {
   WAMessageStubType,
 } from 'baileys';
 import qrcode from 'qrcode-terminal';
-import { isFinishedSession } from './session_check.js';
+import { hasLinkedIdentity } from './session_check.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -155,9 +155,9 @@ async function resolveWebVersion() {
  * sees an identity and tries to resume a login that never happened,
  * so it never shows a QR again and the sidecar looks stuck.
  *
- * A finished session has `registered` set and the signed identity
- * key Baileys writes after pairing. Anything else is discarded so
- * the login starts over.
+ * A real link has a signed identity key and a `me.id`. Anything else
+ * is discarded so the login starts over. The `registered` flag is not
+ * reliable enough to use here.
  */
 function clearUnfinishedSession() {
   const credsPath = path.join(CONFIG.authFolder, 'creds.json');
@@ -175,14 +175,12 @@ function clearUnfinishedSession() {
     creds = {};
   }
 
-  const finished = isFinishedSession(creds);
-
-  if (!creds.me || finished) {
+  if (hasLinkedIdentity(creds)) {
     return false;
   }
 
   console.log(
-    'The saved session was never completed, clearing it so a fresh ' +
+    'The saved session has no linked identity, clearing it so a fresh ' +
       'QR code is shown.',
   );
 
@@ -502,13 +500,19 @@ async function onMessagesUpdate(updates) {
         continue;
       }
 
+      const key = item?.update?.key ?? item?.key ?? {};
+      const messageId = key.id ?? item?.key?.id;
+
+      // Keep this visible: a missed revoke is otherwise invisible and
+      // makes the archive look like it ignored a deletion.
+      console.log(
+        `[update] stub=${stubType} id=${messageId || '(none)'} ` +
+          `delete=${DELETE_STUB_TYPES.has(stubType)}`,
+      );
+
       if (!DELETE_STUB_TYPES.has(stubType)) {
         continue;
       }
-
-      const key = item?.update?.key ?? item?.key ?? {};
-
-      const messageId = key.id ?? item?.key?.id;
 
       if (!messageId) {
         continue;
@@ -543,6 +547,8 @@ async function onMessagesDelete(event) {
     if (!keys.length) {
       return;
     }
+
+    console.log(`[delete] ${keys.length} message key(s)`);
 
     await postEvent({
       type: 'delete',

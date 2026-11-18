@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { isFinishedSession } from './session_check.js';
+import { hasLinkedIdentity } from './session_check.js';
 
 test('a linked WhatsApp session is preserved', () => {
   assert.equal(
-    isFinishedSession({
+    hasLinkedIdentity({
       registered: true,
       me: { id: '918888888888@s.whatsapp.net' },
       signedIdentityKey: { public: 'pub', private: 'priv' },
@@ -14,19 +14,23 @@ test('a linked WhatsApp session is preserved', () => {
   );
 });
 
-test('an abandoned pairing code session is cleared', () => {
+test('a missing registered flag never wipes a linked session', () => {
   assert.equal(
-    isFinishedSession({
+    hasLinkedIdentity({
       registered: false,
       me: { id: '918888888888@s.whatsapp.net' },
       signedIdentityKey: { public: 'pub', private: 'priv' },
     }),
-    false,
+    true,
   );
 });
 
 test('empty or partial credentials are not treated as a link', () => {
-  assert.equal(isFinishedSession({}), false);
-  assert.equal(isFinishedSession({ me: { id: 'x' } }), false);
-  assert.equal(isFinishedSession(null), false);
+  assert.equal(hasLinkedIdentity({}), false);
+  assert.equal(hasLinkedIdentity({ me: { id: 'x' } }), false);
+  assert.equal(
+    hasLinkedIdentity({ signedIdentityKey: { public: 'pub' } }),
+    false,
+  );
+  assert.equal(hasLinkedIdentity(null), false);
 });

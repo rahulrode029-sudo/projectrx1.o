@@ -8,6 +8,9 @@ Run it as its own process:
     python app.py
 """
 
+from datetime import timedelta, timezone
+from zoneinfo import ZoneInfo
+
 from flask import Flask, jsonify, render_template, request
 from sqlalchemy import func, select
 
@@ -37,6 +40,24 @@ auth.configure(app)
 # Create the tables on import, not only when run as a script, so the
 # schema exists however the app is started.
 init_db()
+
+
+def _display_time(value) -> str:
+    """Show a stored UTC timestamp in the owner's local time zone."""
+
+    if value is None:
+        return ""
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+
+    try:
+        zone = ZoneInfo(settings.display_timezone)
+    except Exception:
+        # Windows installs without tzdata still need the owner's time.
+        zone = timezone(timedelta(hours=5, minutes=30))
+
+    return value.astimezone(zone).strftime("%d %b %H:%M")
 
 
 @app.route("/")
@@ -91,7 +112,7 @@ def _messages_context() -> dict:
                 "contact": row.contact.label if row.contact else "unknown",
                 "body": row.body,
                 "summary": row.summary,
-                "sent_at": row.sent_at.strftime("%d %b %H:%M") if row.sent_at else "",
+                "sent_at": _display_time(row.sent_at),
                 "is_deleted": row.is_deleted,
             }
             for row in rows
@@ -113,7 +134,7 @@ def _messages_context() -> dict:
                 "title": item.title,
                 "body": item.body,
                 "seen": item.seen,
-                "time": item.created_at.strftime("%d %b %H:%M"),
+                "time": _display_time(item.created_at),
             }
             for item in alert_rows
         ]
