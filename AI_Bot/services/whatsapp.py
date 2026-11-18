@@ -18,6 +18,7 @@ from sqlalchemy import select
 from database.database import session_scope
 from models import Alert, Contact, Message, User
 from services import gemini, memory, spam_detector
+from services.tenancy import current_owner_id
 
 
 def owner_chat_id(session) -> int | None:
@@ -71,6 +72,7 @@ def store_alert(
     try:
         with session_scope() as session:
             alert = Alert(
+                owner_id=current_owner_id(),
                 kind=kind,
                 title=title or "",
                 body=body or "",

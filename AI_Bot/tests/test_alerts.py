@@ -3,12 +3,13 @@
 import pytest
 
 from models import Alert
-from services import whatsapp
+from services import accounts, whatsapp
 
 
 @pytest.fixture
 def alert(session):
     item = Alert(
+        owner_id=accounts.bootstrap_admin_id(),
         kind="deleted",
         title="⚠️ Rahul deleted a message",
         body="the original text",

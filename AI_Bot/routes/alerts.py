@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, redirect, request, url_for
 
 from database.database import session_scope
 from models import Alert
+from services.tenancy import current_owner_id
 
 bp = Blueprint("alerts", __name__, url_prefix="/alerts")
 
@@ -15,7 +16,7 @@ def mark_seen(alert_id: int):
     with session_scope() as session:
         alert = session.get(Alert, alert_id)
 
-        if alert is None:
+        if alert is None or alert.owner_id != current_owner_id():
             return jsonify({"error": "no such alert"}), 404
 
         alert.seen = True
@@ -32,7 +33,9 @@ def mark_all_seen():
     """Clear the unread highlight on every alert."""
 
     with session_scope() as session:
-        for alert in session.query(Alert).filter(Alert.seen.is_(False)):
+        for alert in session.query(Alert).filter(
+            Alert.owner_id == current_owner_id(), Alert.seen.is_(False)
+        ):
             alert.seen = True
 
         session.commit()

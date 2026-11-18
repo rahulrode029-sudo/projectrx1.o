@@ -33,6 +33,7 @@ import {
   WAMessageStubType,
 } from 'baileys';
 import qrcode from 'qrcode-terminal';
+import { isFinishedSession } from './session_check.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,6 +43,10 @@ const CONFIG = {
     '',
   ),
   sharedSecret: process.env.WA_SHARED_SECRET || '',
+  // The account this sidecar belongs to. Every event carries its token
+  // so the Python app can store the event under the right user.
+  userToken: process.env.RX_USER_TOKEN || '',
+  userId: process.env.RX_USER_ID || '',
   authFolder: process.env.WA_AUTH_FOLDER || path.join(__dirname, 'auth'),
   helperPort: Number(process.env.WA_HELPER_PORT || 8787),
   reconnectDelay: 5000,
@@ -78,6 +83,7 @@ async function postEvent(payload) {
       headers: {
         'Content-Type': 'application/json',
         'X-WA-Secret': CONFIG.sharedSecret,
+        'X-RX-Token': CONFIG.userToken,
       },
       body: JSON.stringify(payload),
     });
@@ -149,8 +155,9 @@ async function resolveWebVersion() {
  * sees an identity and tries to resume a login that never happened,
  * so it never shows a QR again and the sidecar looks stuck.
  *
- * A finished session has `registered` set and a signed identity
- * key. Anything else is discarded so the login starts over.
+ * A finished session has `registered` set and the signed identity
+ * key Baileys writes after pairing. Anything else is discarded so
+ * the login starts over.
  */
 function clearUnfinishedSession() {
   const credsPath = path.join(CONFIG.authFolder, 'creds.json');
@@ -168,7 +175,7 @@ function clearUnfinishedSession() {
     creds = {};
   }
 
-  const finished = creds.registered === true && creds.signedIdentity;
+  const finished = isFinishedSession(creds);
 
   if (!creds.me || finished) {
     return false;
@@ -253,6 +260,46 @@ function startHelperServer() {
           const parsed = JSON.parse(body || '{}');
           const code = await requestPairingCode(parsed.phone);
           send(200, { pairingCode: code });
+        } catch (error) {
+          send(500, { error: error.message });
+        }
+      });
+
+      return;
+    }
+
+    /**
+     * Send a short text through this account's WhatsApp. Used by the
+     * forgot-password flow, which falls back to SMS when this fails.
+     */
+    if (req.method === 'POST' && req.url === '/send') {
+      if (
+        !CONFIG.userToken ||
+        req.headers['x-rx-token'] !== CONFIG.userToken
+      ) {
+        send(401, { error: 'unauthorised' });
+        return;
+      }
+
+      let body = '';
+
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
+
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const to = String(parsed.to || '');
+          const text = String(parsed.text || '');
+
+          if (!to || !text || !sock || !isConnected) {
+            send(503, { error: 'WhatsApp is not ready' });
+            return;
+          }
+
+          await sock.sendMessage(to, { text });
+          send(200, { ok: true });
         } catch (error) {
           send(500, { error: error.message });
         }

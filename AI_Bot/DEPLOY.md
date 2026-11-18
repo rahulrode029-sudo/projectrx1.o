@@ -1,7 +1,8 @@
 # Deploying RX to a free always-on VM
 
-This deploys the **web app + WhatsApp sidecar only**. The Telegram bot is
-not started. Visitors need the password from `WEB_PASSWORD`.
+This deploys the **web app + one WhatsApp sidecar per account**. The
+Telegram bot is not started. Visitors sign in with a username and password;
+the admin creates accounts at `/admin/users`.
 
 Recommended host: **Oracle Cloud Always Free** (ARM Ampere A1, 4 cores /
 24 GB, free forever). Ubuntu 22.04 or 24.04 works. A Google Cloud e2-micro
@@ -11,7 +12,8 @@ also works but is much slower.
 
 - Create an Oracle Cloud free-tier ARM instance with Ubuntu.
 - Add an ingress rule for **port 80** and **port 443** from `0.0.0.0/0`.
-- Do not expose ports 5000 or 8787 — only nginx should reach them.
+- Do not expose port 5000, or the sidecar helper ports (8787, 8788, …) —
+  only nginx and localhost should reach them.
 
 ## 2. Install dependencies
 
@@ -52,24 +54,36 @@ Create `/opt/rx/AI_Bot/.env` from `.env.example` and fill in:
 
 ```ini
 Gemini_API_KEY=...
-TMDB_API_KEY=...
 TELEGRAM_BOT_TOKEN=          # leave empty: no Telegram bot
+TMDB_API_KEY=                # optional, movies are removed from the UI
 
 WEB_PASSWORD=choose-a-strong-password
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=choose-a-strong-password
+ADMIN_PHONE=919423031182
+PUBLIC_BASE_URL=https://your-domain.example
 FLASK_SECRET_KEY=<python3 -c "import secrets; print(secrets.token_hex(32))">
 WEB_HOST=127.0.0.1
 WEB_PORT=5000
 WEB_DEBUG=false
+RX_USE_WAITRESS=1
 
 WA_SHARED_SECRET=<generate a long random string>
-WA_PAIRING_PHONE=919423031182   # digits + country code, or leave empty to scan QR
+WA_PAIRING_PHONE=919423031182   # admin only; users scan their own QR
 FLASK_URL=http://127.0.0.1:5000
-WA_SIDECAR_URL=http://127.0.0.1:5000
 WATCH_REGION=IN
+
+# Forgot-password fallback (fill after your templates are approved)
+MSG91_AUTH_KEY=...
+MSG91_SENDER_ID=RXINFO
+MSG91_OTP_TEMPLATE_ID=...
+MSG91_RESET_TEMPLATE_ID=...
 ```
 
-The `WA_SHARED_SECRET` must be the same value in both the Flask app and
-the sidecar — both read the same `.env` here.
+`WEB_PASSWORD` is only the bootstrap fallback for `ADMIN_PASSWORD`.
+`WA_SHARED_SECRET` is read by both the app and the sidecars from the same
+`.env`. `PUBLIC_BASE_URL` must be the public HTTPS domain, since reset
+links are sent to phones.
 
 ```bash
 sudo chown -R rx:rx /opt/rx/AI_Bot
@@ -86,18 +100,16 @@ cd /opt/rx/AI_Bot
 ## 5. Run as services
 
 ```bash
-sudo cp /opt/rx/AI_Bot/deploy/rx-web.service /etc/systemd/system/
-sudo cp /opt/rx/AI_Bot/deploy/rx-whatsapp.service /etc/systemd/system/
+sudo cp /opt/rx/AI_Bot/deploy/rx.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now rx-web rx-whatsapp
-sudo systemctl status rx-web rx-whatsapp
+sudo systemctl enable --now rx
+sudo systemctl status rx
 ```
 
 Logs:
 
 ```bash
-sudo journalctl -u rx-web -f
-sudo journalctl -u rx-whatsapp -f
+sudo journalctl -u rx -f
 ```
 
 ## 6. nginx and HTTPS
@@ -134,10 +146,16 @@ visitors behind nginx.
 
 ## 7. Link WhatsApp
 
-Open `https://your-domain.example/qr` after logging in. Scan the QR with
-WhatsApp → Linked devices, or set `WA_PAIRING_PHONE` and use the pairing
-code. The session is stored in `whatsapp_sidecar/auth/` on the VM and
-survives restarts.
+Log in as the admin and open `https://your-domain.example/qr`. Scan the QR
+with WhatsApp → Linked devices, or use the pairing code configured by
+`WA_PAIRING_PHONE`. Each account has its own session folder under
+`whatsapp_sidecar/auth/<user id>/` and its own helper port, so users never
+share a link. Sessions survive restarts.
+
+Other accounts are created at `/admin/users`. Share each temporary
+password privately; users can change it at `/account`. When a new account
+is created, the supervisor starts its sidecar within a couple of seconds
+and its QR appears at `/qr` for that user.
 
 **Data-centre IPs can be flagged by WhatsApp.** Use a spare SIM for
 linking. If the account gets banned, the web app still works — only the
@@ -146,14 +164,16 @@ WhatsApp connector stops.
 ## 8. Verify
 
 ```bash
-sudo systemctl is-active rx-web rx-whatsapp
+sudo systemctl is-active rx
 curl -k https://your-domain.example/health
 ```
 
 In the browser:
 
 - `/` redirects to `/login` when signed out
-- `/messages` shows the alerts panel
+- `/login` asks for a username **and** password; `/forgot-password` is public
+- `/messages` shows only the signed-in user's alerts and archive
+- `/admin/users` is visible only to the admin
 - Send a WhatsApp message from another phone, delete it, and confirm the
   alert with the original text appears on `/messages`
 

@@ -17,10 +17,22 @@ import segno
 from flask import Blueprint, Response, jsonify, render_template, request
 
 from config import settings
+from routes.auth import current_user
 
 bp = Blueprint("qr", __name__)
 
 HELPER_TIMEOUT = 5.0
+
+
+def _helper_url() -> str:
+    """The signed-in account's own sidecar helper, not a shared one."""
+
+    user = current_user()
+
+    if user is not None and user.wa_port:
+        return f"http://127.0.0.1:{user.wa_port}"
+
+    return settings.wa_helper_url.rstrip("/")
 
 
 def _helper_state():
@@ -30,7 +42,7 @@ def _helper_state():
     showing an error.
     """
 
-    url = f"{settings.wa_helper_url.rstrip('/')}/qr"
+    url = f"{_helper_url()}/qr"
 
     try:
         response = httpx.get(url, timeout=HELPER_TIMEOUT)
@@ -136,7 +148,7 @@ def pairing():
     if not phone:
         return jsonify({"error": "phone is required"}), 400
 
-    url = f"{settings.wa_helper_url.rstrip('/')}/pairing"
+    url = f"{_helper_url()}/pairing"
 
     try:
         response = httpx.post(

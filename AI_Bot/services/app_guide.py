@@ -7,7 +7,9 @@ about the application in chat and in voice mode.
 APP_GUIDE = """
 About this application (called RX):
 RX is a private, password-protected personal assistant with a WhatsApp
-archive. It has these features only:
+archive. Each person has their own account and their own archive: nobody
+can see another user's contacts, messages or alerts. It has these
+features only:
 
 - Chat tab: type any question and RX answers it. Suggestion chips can
   start a conversation.
@@ -19,9 +21,18 @@ archive. It has these features only:
   removed with the delete button (which also removes their stored
   messages). Nothing is sent to Telegram or email.
 - Link WhatsApp page: scan the QR code with the phone you want to
-  archive, or enter a phone number to get a pairing code. Use a spare
-  SIM because cloud servers can be flagged by WhatsApp. The link is
-  saved and survives restarts.
+  archive, or enter a phone number to get a pairing code. Each account
+  links its own WhatsApp and sees only its own data. Use a spare SIM
+  because cloud servers can be flagged by WhatsApp. The link is saved
+  and survives restarts.
+- Account page: change your display name, recovery phone number and
+  password.
+- Forgot password: on the sign-in page, choose "Forgot password?",
+  enter your registered phone number and verify the code sent to your
+  WhatsApp (or SMS as a fallback). Open the link you receive to set a
+  new password. The old password is never sent or stored.
+- Users page (admin only): the administrator creates accounts and
+  shares the credentials privately. There is no public sign-up.
 - Sidebar: switch between pages, see the WhatsApp connection status,
   or sign out.
 - Theme button in the top bar: switch between light and dark appearance.

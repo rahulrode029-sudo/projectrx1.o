@@ -18,6 +18,18 @@
 
             <input type="hidden" name="next" value="{{ next_url }}">
 
+            <label for="username">Username</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                placeholder="Your username"
+                value="{{ username | default('') }}"
+                autocomplete="username"
+                autofocus
+                required
+            >
+
             <label for="password">Password</label>
 
             <div class="password-field">
@@ -27,7 +39,6 @@
                     name="password"
                     placeholder="Enter your password"
                     autocomplete="current-password"
-                    autofocus
                     required
                 >
                 <button type="button" id="show-password" class="password-toggle" aria-label="Show password">Show</button>
@@ -40,6 +51,8 @@
             {% endif %}
 
             <button type="submit" class="btn primary full">Sign in</button>
+
+            <a class="auth-forgot" href="/forgot-password">Forgot password?</a>
 
         </form>
 

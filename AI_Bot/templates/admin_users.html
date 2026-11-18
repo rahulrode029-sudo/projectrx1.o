@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Users — RX{% endblock %}
+{% block heading %}Users{% endblock %}
+{% block subtitle %}<p>Create accounts and share the credentials privately.</p>{% endblock %}
+
+{% block content %}
+
+{% with flashes = get_flashed_messages(with_categories=true) %}
+    {% if flashes %}
+        <div class="flash-stack">
+            {% for category, message in flashes %}
+                <div class="flash {{ category }}">
+                    <svg class="icon"><use href="#i-{{ 'check' if category == 'success' else 'info' }}"/></svg>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<section class="card admin-card">
+    <div class="card-head">
+        <div class="card-title">
+            <span class="title-icon accent"><svg class="icon"><use href="#i-user"/></svg></span>
+            <div><h2>Add a user</h2><p>Each user gets their own archive and WhatsApp link.</p></div>
+        </div>
+    </div>
+
+    <form class="admin-form" method="post" action="/admin/users/create">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="text" name="display_name" placeholder="Display name (optional)">
+        <input type="tel" name="phone" placeholder="Phone number" required>
+        <input type="password" name="password" placeholder="Temporary password (blank = generated)">
+        <button type="submit" class="btn primary">Create user</button>
+    </form>
+</section>
+
+<section class="card admin-card">
+    <div class="card-head">
+        <div class="card-title">
+            <span class="title-icon accent"><svg class="icon"><use href="#i-shield"/></svg></span>
+            <div><h2>All users</h2><p>{{ users | length }} account(s)</p></div>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>WhatsApp port</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>
+                            <strong>{{ user.label }}</strong><br>
+                            <small>{{ user.username }}</small>
+                        </td>
+                        <td>{{ user.phone or '—' }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>
+                            <span class="pill {{ 'success' if user.is_active else 'muted' }}">
+                                {{ 'Active' if user.is_active else 'Disabled' }}
+                            </span>
+                        </td>
+                        <td>{{ user.wa_port or '—' }}</td>
+                        <td>
+                            <div class="table-actions">
+                                <form method="post" action="/admin/users/{{ user.id }}/send-reset">
+                                    <button type="submit" class="btn small">Send reset link</button>
+                                </form>
+                                <form method="post" action="/admin/users/{{ user.id }}/active">
+                                    <input type="hidden" name="active" value="{{ '0' if user.is_active else '1' }}">
+                                    <button type="submit" class="btn small">
+                                        {{ 'Disable' if user.is_active else 'Enable' }}
+                                    </button>
+                                </form>
+                                <form method="post" action="/admin/users/{{ user.id }}/delete"
+                                      data-confirm="Delete {{ user.username }} and all of their data? This cannot be undone.">
+                                    <button type="submit" class="btn small danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% endblock %}

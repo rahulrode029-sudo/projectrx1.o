@@ -32,14 +32,19 @@ def test_login_page_is_public(anon_client):
 
 
 def test_wrong_password_is_rejected(anon_client):
-    response = anon_client.post("/login", data={"password": "not-the-password"})
+    response = anon_client.post(
+        "/login", data={"username": "admin", "password": "not-the-password"}
+    )
 
     assert response.status_code == 401
-    assert b"Wrong password" in response.data
+    assert b"Wrong username or password" in response.data
 
 
 def test_correct_password_logs_in(anon_client):
-    response = anon_client.post("/login", data={"password": settings.web_password})
+    response = anon_client.post(
+        "/login",
+        data={"username": "admin", "password": settings.admin_password},
+    )
 
     assert response.status_code == 302
     assert anon_client.get("/messages").status_code == 200
@@ -53,7 +58,11 @@ def test_logout_ends_the_session(client):
 def test_login_does_not_redirect_offsite(anon_client):
     response = anon_client.post(
         "/login",
-        data={"password": settings.web_password, "next": "//evil.example"},
+        data={
+            "username": "admin",
+            "password": settings.admin_password,
+            "next": "//evil.example",
+        },
     )
 
     assert response.status_code == 302

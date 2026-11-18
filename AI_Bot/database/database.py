@@ -7,7 +7,7 @@ readers and a writer work at the same time instead of blocking.
 
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
@@ -51,12 +51,68 @@ def _set_sqlite_pragmas(dbapi_connection, connection_record):
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+TENANT_TABLES = ("contacts", "conversations", "messages", "alerts")
+
+
+def _migrate_tenancy():
+    """Upgrade an older single-user database in place.
+
+    SQLite cannot change an existing column's uniqueness, so the two
+    old global unique indexes are replaced with per-owner ones.
+    """
+
+    inspector = inspect(engine)
+    existing = set(inspector.get_table_names())
+
+    with engine.begin() as connection:
+
+        for table in TENANT_TABLES:
+            if table not in existing:
+                continue
+
+            columns = {column["name"] for column in inspector.get_columns(table)}
+
+            if "owner_id" not in columns:
+                connection.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN owner_id INTEGER")
+                )
+
+        connection.execute(text("DROP INDEX IF EXISTS ix_contacts_jid"))
+        connection.execute(text("DROP INDEX IF EXISTS ix_messages_channel_wamid"))
+
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_contacts_owner_jid "
+                "ON contacts(owner_id, jid)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_messages_owner_wamid "
+                "ON messages(owner_id, channel, wa_message_id)"
+            )
+        )
+
+        for table in TENANT_TABLES:
+            connection.execute(
+                text(
+                    f"CREATE INDEX IF NOT EXISTS ix_{table}_owner_id "
+                    f"ON {table}(owner_id)"
+                )
+            )
+
+
 def init_db():
-    """Create any table that does not exist yet."""
+    """Create the schema and upgrade older single-user databases."""
 
     import models  # noqa: F401  (imported so the tables are registered)
 
     Base.metadata.create_all(bind=engine)
+    _migrate_tenancy()
+
+    from services.accounts import bootstrap_admin
+
+    bootstrap_admin()
 
 
 def session_scope():

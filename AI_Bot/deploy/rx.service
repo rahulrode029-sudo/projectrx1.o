@@ -1,0 +1,18 @@
+[Unit]
+Description=RX web app and per-user WhatsApp sidecars
+After=network.target
+
+[Service]
+Type=simple
+User=rx
+Group=rx
+WorkingDirectory=/opt/rx/AI_Bot
+EnvironmentFile=/opt/rx/AI_Bot/.env
+# One supervisor starts waitress plus one Baileys sidecar per active
+# account. New accounts are picked up without a systemd restart.
+ExecStart=/opt/rx/AI_Bot/venv/bin/python run.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -11,6 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from database.database import session_scope
+from services.tenancy import current_owner_id
 from models import (
     DEFAULT_NOTIFY_MODE,
     Contact,
@@ -46,13 +47,18 @@ def get_or_create_contact(
     push_name=None,
     phone=None,
 ) -> Contact:
-    """Find a contact by JID, or create it."""
+    """Find a contact by JID, or create it, for the current account."""
 
-    contact = session.scalar(select(Contact).where(Contact.jid == jid))
+    owner_id = current_owner_id()
+
+    contact = session.scalar(
+        select(Contact).where(Contact.jid == jid, Contact.owner_id == owner_id)
+    )
 
     if contact is None:
 
         contact = Contact(
+            owner_id=owner_id,
             jid=jid,
             push_name=push_name,
             phone=phone,
@@ -92,16 +98,20 @@ def get_or_create_conversation(
 ) -> Conversation:
     """Find the chat thread for a JID, or create it."""
 
+    owner_id = current_owner_id()
+
     conversation = session.scalar(
         select(Conversation).where(
             Conversation.channel == "whatsapp",
             Conversation.chat_jid == chat_jid,
+            Conversation.owner_id == owner_id,
         )
     )
 
     if conversation is None:
 
         conversation = Conversation(
+            owner_id=owner_id,
             channel="whatsapp",
             chat_jid=chat_jid,
             contact_id=contact.id if contact else None,
@@ -149,10 +159,13 @@ def store_message(
     returned rather than duplicated.
     """
 
+    owner_id = current_owner_id()
+
     existing = session.scalar(
         select(Message).where(
             Message.channel == "whatsapp",
             Message.wa_message_id == wa_message_id,
+            Message.owner_id == owner_id,
         )
     )
 
@@ -171,6 +184,7 @@ def store_message(
     )
 
     message = Message(
+        owner_id=owner_id,
         channel="whatsapp",
         conversation_id=conversation.id,
         contact_id=contact.id if contact else None,
@@ -206,6 +220,7 @@ def mark_deleted(
         select(Message).where(
             Message.channel == "whatsapp",
             Message.wa_message_id == wa_message_id,
+            Message.owner_id == current_owner_id(),
         )
     )
 
@@ -227,6 +242,7 @@ def get_message(session: Session, wa_message_id: str) -> Message | None:
         select(Message).where(
             Message.channel == "whatsapp",
             Message.wa_message_id == wa_message_id,
+            Message.owner_id == current_owner_id(),
         )
     )
 
@@ -242,6 +258,7 @@ def recent_from(
     query = (
         select(Message)
         .where(Message.contact_id == contact.id)
+        .where(Message.owner_id == current_owner_id())
         .order_by(Message.sent_at.desc())
         .limit(limit)
     )
@@ -260,6 +277,7 @@ def list_deleted(session: Session, limit: int = 50) -> list[Message]:
     query = (
         select(Message)
         .where(Message.is_deleted.is_(True))
+        .where(Message.owner_id == current_owner_id())
         .order_by(Message.deleted_at.desc())
         .limit(limit)
     )
@@ -269,7 +287,11 @@ def list_deleted(session: Session, limit: int = 50) -> list[Message]:
 
 def all_contacts(session: Session) -> list[Contact]:
     return list(
-        session.scalars(select(Contact).order_by(Contact.push_name))
+        session.scalars(
+            select(Contact)
+            .where(Contact.owner_id == current_owner_id())
+            .order_by(Contact.push_name)
+        )
     )
 
 
@@ -284,14 +306,16 @@ def resolve_contact(session: Session, query: str) -> Contact | None:
         return None
 
     text = query.strip().lower()
+    owner_id = current_owner_id()
 
     contact = session.scalar(
         select(Contact).where(
+            Contact.owner_id == owner_id,
             or_(
                 Contact.jid == query,
                 Contact.phone == query,
                 Contact.push_name == query,
-            )
+            ),
         )
     )
 
@@ -303,7 +327,9 @@ def resolve_contact(session: Session, query: str) -> Contact | None:
 
     if digits:
 
-        contacts = list(session.scalars(select(Contact)))
+        contacts = list(
+            session.scalars(select(Contact).where(Contact.owner_id == owner_id))
+        )
 
         for candidate in contacts:
 
@@ -319,6 +345,7 @@ def resolve_contact(session: Session, query: str) -> Contact | None:
     # Partial name match.
     partial = session.scalar(
         select(Contact).where(
+            Contact.owner_id == owner_id,
             Contact.push_name.isnot(None),
             Contact.push_name.ilike(f"%{query}%"),
         )
@@ -327,7 +354,9 @@ def resolve_contact(session: Session, query: str) -> Contact | None:
     if partial is not None:
         return partial
 
-    contacts = list(session.scalars(select(Contact)))
+    contacts = list(
+        session.scalars(select(Contact).where(Contact.owner_id == owner_id))
+    )
 
     for candidate in contacts:
 
@@ -387,6 +416,7 @@ def needs_summary(session: Session, limit: int = 20) -> list[Message]:
 
     query = (
         select(Message)
+        .where(Message.owner_id == current_owner_id())
         .where(Message.summary.is_(None))
         .where(Message.body != "")
         .order_by(Message.sent_at.desc())
@@ -428,7 +458,10 @@ def semantic_search(
 ) -> list[tuple[Message, float]]:
     """Messages most similar to a query vector, best first."""
 
-    query = select(Message).where(Message.embedding.isnot(None))
+    query = select(Message).where(
+        Message.embedding.isnot(None),
+        Message.owner_id == current_owner_id(),
+    )
 
     if contact_id is not None:
         query = query.where(Message.contact_id == contact_id)
@@ -461,6 +494,7 @@ def keyword_search(
     query = (
         select(Message)
         .where(Message.body.ilike(f"%{text}%"))
+        .where(Message.owner_id == current_owner_id())
         .order_by(Message.sent_at.desc())
         .limit(limit)
     )

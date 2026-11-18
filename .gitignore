@@ -106,7 +106,9 @@ temp/
 # =========================
 # Machine Learning / AI
 # =========================
-models/
+# Only ignore ML model files at the repository root. AI_Bot/models holds
+# SQLAlchemy source files and must be committed.
+/models/
 checkpoints/
 *.pt
 *.pth

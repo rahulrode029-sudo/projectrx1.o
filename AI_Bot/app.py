@@ -14,12 +14,15 @@ from sqlalchemy import func, select
 from config import settings
 from database.database import init_db, session_scope
 from models import Alert, Message
-from routes import alerts, auth, chat, contacts, qr, voice, whatsapp
+from routes import admin, alerts, auth, chat, contacts, qr, recovery, voice, whatsapp
 from services import memory
+from services.tenancy import current_owner_id
 
 app = Flask(__name__)
 
 app.register_blueprint(auth.bp)
+app.register_blueprint(admin.bp)
+app.register_blueprint(recovery.bp)
 app.register_blueprint(alerts.bp)
 app.register_blueprint(chat.bp)
 app.register_blueprint(contacts.bp)
@@ -50,6 +53,7 @@ def messages_page():
     contact_query = request.args.get("contact", "").strip()
 
     limit = 50
+    owner_id = current_owner_id()
 
     with session_scope() as session:
 
@@ -67,6 +71,7 @@ def messages_page():
             rows = list(
                 session.scalars(
                     select(Message)
+                    .where(Message.owner_id == owner_id)
                     .order_by(Message.sent_at.desc())
                     .limit(limit)
                 )
@@ -95,7 +100,10 @@ def messages_page():
 
         alert_rows = list(
             session.scalars(
-                select(Alert).order_by(Alert.seen, Alert.created_at.desc()).limit(20)
+                select(Alert)
+                .where(Alert.owner_id == owner_id)
+                .order_by(Alert.seen, Alert.created_at.desc())
+                .limit(20)
             )
         )
 
@@ -114,7 +122,7 @@ def messages_page():
         unread = session.scalar(
             select(func.count())
             .select_from(Alert)
-            .where(Alert.seen.is_(False))
+            .where(Alert.owner_id == owner_id, Alert.seen.is_(False))
         )
 
     return render_template(

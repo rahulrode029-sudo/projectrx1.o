@@ -13,8 +13,9 @@ from sqlalchemy import select
 from config import settings
 from database.database import session_scope
 from models import Contact, Message
-from services import memory
+from services import accounts, memory
 from services import whatsapp as whatsapp_service
+from services.tenancy import current_owner_id, set_owner
 
 bp = Blueprint("whatsapp", __name__, url_prefix="/wa")
 
@@ -35,7 +36,23 @@ def _authorised() -> bool:
         )
         return False
 
-    return request.headers.get("X-WA-Secret", "") == secret
+    if request.headers.get("X-WA-Secret", "") != secret:
+        return False
+
+    # Each sidecar carries a per-account token. A caller without one is
+    # treated as the legacy single-sidecar install (the admin account).
+    token = request.headers.get("X-RX-Token", "")
+    user = accounts.find_by_wa_token(token) if token else None
+
+    if user is None:
+        user = accounts.get_user(accounts.bootstrap_admin_id())
+
+    if user is None or not user.is_active:
+        return False
+
+    set_owner(user.id)
+
+    return True
 
 
 def _handle_contact(payload):
@@ -160,6 +177,7 @@ def messages():
             rows = list(
                 session.scalars(
                     select(Message)
+                    .where(Message.owner_id == current_owner_id())
                     .order_by(Message.sent_at.desc())
                     .limit(limit)
                 )

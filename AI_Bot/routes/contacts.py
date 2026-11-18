@@ -6,6 +6,7 @@ from sqlalchemy import select
 from database.database import session_scope
 from models import Alert, Contact, Conversation, Message
 from services import memory
+from services.tenancy import current_owner_id
 
 bp = Blueprint("contacts", __name__, url_prefix="/contacts")
 
@@ -45,7 +46,9 @@ def add():
 
     with session_scope() as session:
         existing = session.scalar(
-            select(Contact).where(Contact.jid == jid)
+            select(Contact).where(
+                Contact.jid == jid, Contact.owner_id == current_owner_id()
+            )
         )
 
         if existing is not None:
@@ -75,7 +78,7 @@ def delete(contact_id: int):
     with session_scope() as session:
         contact = session.get(Contact, contact_id)
 
-        if contact is None:
+        if contact is None or contact.owner_id != current_owner_id():
             flash("That contact no longer exists.", "error")
             return redirect(url_for("messages_page"))
 

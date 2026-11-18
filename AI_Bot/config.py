@@ -98,6 +98,17 @@ class Settings:
     web_port: int
     web_debug: bool
 
+    # --- Accounts and recovery ---
+    admin_username: str
+    admin_password: str
+    admin_phone: str
+    public_base_url: str
+    msg91_api_url: str
+    msg91_auth_key: str
+    msg91_sender_id: str
+    msg91_otp_template_id: str
+    msg91_reset_template_id: str
+
     # --- Storage ---
     db_path: Path
     media_dir: Path
@@ -127,7 +138,9 @@ def _warn_about_malformed_env():
 
     for name, value in os.environ.items():
 
-        if not name.startswith(("GEMINI", "TELEGRAM", "TMDB", "WA_", "DB_", "MEDIA_")):
+        if not name.startswith(
+            ("GEMINI", "TELEGRAM", "TMDB", "WA_", "DB_", "MEDIA_", "ADMIN_", "MSG91_")
+        ):
             continue
 
         if not value:
@@ -188,6 +201,20 @@ def load_settings() -> Settings:
         web_host=_env("WEB_HOST", "127.0.0.1"),
         web_port=int(_env("WEB_PORT", "5000")),
         web_debug=_env_bool("WEB_DEBUG", False),
+        # First admin account. WEB_PASSWORD is kept as a fallback so an
+        # existing single-password install upgrades without a downtime.
+        admin_username=_env("ADMIN_USERNAME", "admin"),
+        admin_password=_env("ADMIN_PASSWORD", _env("WEB_PASSWORD", "")),
+        admin_phone=_env("ADMIN_PHONE", ""),
+        # Used when a password-reset link is sent as a text message.
+        public_base_url=_env("PUBLIC_BASE_URL", "http://127.0.0.1:5000"),
+        msg91_api_url=_env(
+            "MSG91_API_URL", "https://control.msg91.com/api/v5/flow/"
+        ),
+        msg91_auth_key=_env("MSG91_AUTH_KEY", ""),
+        msg91_sender_id=_env("MSG91_SENDER_ID", "RXINFO"),
+        msg91_otp_template_id=_env("MSG91_OTP_TEMPLATE_ID", ""),
+        msg91_reset_template_id=_env("MSG91_RESET_TEMPLATE_ID", ""),
         db_path=db_path,
         media_dir=media_dir,
     )

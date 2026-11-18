@@ -87,6 +87,28 @@
                 <span id="wa-label">Checking WhatsApp…</span>
             </div>
 
+            {% if viewer %}
+                <div class="viewer-card">
+                    <span class="avatar">{{ viewer.label[:1] | upper }}</span>
+                    <span class="viewer-info">
+                        <strong>{{ viewer.label }}</strong>
+                        <small>{{ viewer.username }}</small>
+                    </span>
+                </div>
+
+                <a class="nav-link small-link" href="/account">
+                    <svg class="icon"><use href="#i-user"/></svg>
+                    <span>Account</span>
+                </a>
+
+                {% if viewer.role == 'admin' %}
+                    <a class="nav-link small-link" href="/admin/users">
+                        <svg class="icon"><use href="#i-shield"/></svg>
+                        <span>Users</span>
+                    </a>
+                {% endif %}
+            {% endif %}
+
             <a class="nav-link" href="/logout">
                 <svg class="icon"><use href="#i-logout"/></svg>
                 <span>Sign out</span>
