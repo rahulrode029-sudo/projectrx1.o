@@ -48,6 +48,21 @@ python run.py
 
 Open **http://127.0.0.1:5000/login**.
 
+### One-click local start (Windows)
+
+Double-click `START_RX.bat` (or the **RX Local** shortcut on the Desktop).
+It detects the PC's LAN IP, updates `WEB_HOST` and `PUBLIC_BASE_URL`
+automatically, then starts the app and prints both URLs:
+
+```
+PC    : http://127.0.0.1:5000/login
+Mobile: http://192.168.x.x:5000/login   (same Wi-Fi)
+```
+
+Close the console window to stop the app. For mobile access, run
+`ALLOW_FIREWALL.bat` (or **RX Allow Firewall** on the Desktop) once with
+**Run as administrator** to open port 5000 on the local network.
+
 `run.py` starts the web app and one WhatsApp sidecar for every active
 account. A newly created user gets their own sidecar within a couple of
 seconds without restarting the launcher. Ctrl+C stops everything.
