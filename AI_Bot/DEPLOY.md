@@ -4,14 +4,28 @@ This deploys the **web app + one WhatsApp sidecar per account**. Visitors
 sign in with a username and password; the admin creates accounts at
 `/admin/users`. Alerts stay on the website.
 
-Recommended host: **Oracle Cloud Always Free** (ARM Ampere A1, 4 cores /
-24 GB, free forever). Ubuntu 22.04 or 24.04 works. A Google Cloud e2-micro
-also works but is much slower.
+Recommended host: **Oracle Cloud Always Free** (ARM Ampere A1,
+**2 OCPU / 12 GB**, free forever as of 2026). Ubuntu 22.04 or 24.04 works.
+A Google Cloud e2-micro also works but is much slower.
+
+> Older guides advertise 4 OCPU / 24 GB. Oracle reduced the Always Free
+> Ampere allocation in 2026, so provision **2 OCPU / 12 GB** to stay free.
 
 ## 1. Create the VM
 
-- Create an Oracle Cloud free-tier ARM instance with Ubuntu.
-- Add an ingress rule for **port 80** and **port 443** from `0.0.0.0/0`.
+- Create an Oracle Cloud free-tier ARM instance (`VM.Standard.A1.Flex`)
+  with Ubuntu. Choose the home region carefully — it cannot be changed
+  later. If you see "Out of host capacity", try another availability
+  domain, a smaller shape, or retry later.
+- Generate/download an SSH key pair in the console; you need the private
+  key to connect.
+- Add ingress rules for **port 22** (your IP only, if possible), **port 80**
+  and **port 443** from `0.0.0.0/0`.
+- Oracle Ubuntu images also have a host firewall. After first login:
+  ```bash
+  sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+  ```
 - Do not expose port 5000, or the sidecar helper ports (8787, 8788, …) —
   only nginx and localhost should reach them.
 
