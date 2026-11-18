@@ -23,7 +23,7 @@
     {% endif %}
 {% endwith %}
 
-<section class="card alerts-card">
+<section class="card alerts-card" data-live-url="/messages/live">
 
     <div class="card-head">
         <div class="card-title">
@@ -34,7 +34,7 @@
             </div>
         </div>
 
-        <div class="card-actions">
+        <div class="card-actions" id="alerts-actions">
             {% if unread %}
                 <span class="pill danger">{{ unread }} new</span>
                 <form method="post" action="/alerts/seen-all">
@@ -46,6 +46,7 @@
         </div>
     </div>
 
+    <div id="alerts-live">
     {% if not alerts %}
         <div class="empty-state compact">
             <span class="empty-icon"><svg class="icon"><use href="#i-bell"/></svg></span>
@@ -77,6 +78,7 @@
             {% endfor %}
         </ul>
     {% endif %}
+    </div>
 
 </section>
 
@@ -127,7 +129,7 @@
 
     </aside>
 
-    <section class="card messages-card">
+    <section class="card messages-card" data-live-url="/messages/live">
 
         <form class="search-form" method="get" action="/messages">
             <svg class="icon"><use href="#i-search"/></svg>
@@ -144,6 +146,7 @@
             {% endif %}
         </form>
 
+        <div id="messages-live">
         {% if not messages %}
             <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#i-messages"/></svg></span>
@@ -161,7 +164,7 @@
                             <strong>{{ message.contact }}</strong>
                             <span class="muted">{{ message.sent_at }}</span>
                             {% if message.is_deleted %}
-                                <span class="pill danger">deleted</span>
+                                <span class="pill danger">Deleted</span>
                             {% endif %}
                         </div>
                         {% if message.summary %}
@@ -172,6 +175,7 @@
                 {% endfor %}
             </ul>
         {% endif %}
+        </div>
 
     </section>
 

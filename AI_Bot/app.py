@@ -46,9 +46,8 @@ def home():
     return render_template("index.html")
 
 
-@app.route("/messages")
-def messages_page():
-    """Browse the captured WhatsApp messages."""
+def _messages_context() -> dict:
+    """Everything the Messages page shows, scoped to the signed-in user."""
 
     contact_query = request.args.get("contact", "").strip()
 
@@ -125,14 +124,27 @@ def messages_page():
             .where(Alert.owner_id == owner_id, Alert.seen.is_(False))
         )
 
-    return render_template(
-        "messages.html",
-        contacts=contact_rows,
-        messages=message_rows,
-        alerts=alerts_data,
-        unread=unread,
-        query=contact_query,
-    )
+    return {
+        "contacts": contact_rows,
+        "messages": message_rows,
+        "alerts": alerts_data,
+        "unread": unread,
+        "query": contact_query,
+    }
+
+
+@app.route("/messages")
+def messages_page():
+    """Browse the captured WhatsApp messages."""
+
+    return render_template("messages.html", **_messages_context())
+
+
+@app.route("/messages/live")
+def messages_live():
+    """JSON snapshot used by the page to pick up new events on its own."""
+
+    return jsonify(_messages_context())
 
 
 @app.route("/health")

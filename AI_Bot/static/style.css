@@ -1194,7 +1194,19 @@ code {
 }
 
 .message-row.deleted {
+    border: 1px solid var(--danger);
     border-left: 3px solid var(--danger);
+    background: var(--danger-soft);
+}
+
+.message-row.deleted .summary,
+.message-row.deleted .raw {
+    color: var(--danger);
+}
+
+.message-row.deleted .meta .muted {
+    color: var(--danger);
+    opacity: .75;
 }
 
 .message-row .meta {

@@ -153,6 +153,58 @@ def test_sidecar_message_api_is_owner_scoped(client, other_client, session):
     assert marker in [row["body"] for row in own["messages"]]
 
 
+def test_live_messages_endpoint_is_owner_scoped(client, other_client, session):
+    other, _ = other_client
+    marker = "LIVE-PRIVATE-" + uuid.uuid4().hex[:8]
+
+    with owner_scope(accounts.bootstrap_admin_id()):
+        memory.store_message(
+            session,
+            chat_jid="915544332211@s.whatsapp.net",
+            wa_message_id=marker,
+            body=marker,
+            sender_jid="915544332211@s.whatsapp.net",
+            sender_name="LiveScope",
+        )
+        session.commit()
+
+    assert marker not in [
+        row["body"] for row in other.get("/messages/live").get_json()["messages"]
+    ]
+    assert marker in [
+        row["body"] for row in client.get("/messages/live").get_json()["messages"]
+    ]
+
+
+def test_deleted_messages_are_flagged_and_shown_in_red(client, session):
+    marker = "DELETED-RED-" + uuid.uuid4().hex[:8]
+
+    with owner_scope(accounts.bootstrap_admin_id()):
+        message = memory.store_message(
+            session,
+            chat_jid="914433221100@s.whatsapp.net",
+            wa_message_id=marker,
+            body=marker,
+            sender_jid="914433221100@s.whatsapp.net",
+            sender_name="DeletedRed",
+        )
+        memory.mark_deleted(session, marker, "delete")
+        session.commit()
+
+    row = next(
+        item
+        for item in client.get("/messages/live").get_json()["messages"]
+        if item["id"] == message.id
+    )
+
+    assert row["is_deleted"] is True
+
+    html = client.get("/messages").get_data(as_text=True)
+
+    assert "message-row deleted" in html
+    assert ">Deleted</span>" in html
+
+
 def test_forgot_password_flow_sets_a_new_password(other_client, anon_client, monkeypatch):
     client, user = other_client
     captured = {}

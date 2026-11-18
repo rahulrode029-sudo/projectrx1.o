@@ -173,6 +173,157 @@
     });
 
     // -----------------------------------------------------
+    // Messages page: pick up new messages and alerts on its own.
+    // Only the two lists are replaced, so the current filter, scroll
+    // position and any form the user is filling in stay untouched.
+    // -----------------------------------------------------
+
+    var liveSection = document.querySelector("[data-live-url]");
+    var lastLiveSnapshot = "";
+
+    function escapeHtml(value) {
+        return String(value === null || value === undefined ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderLiveMessages(items) {
+        var host = document.getElementById("messages-live");
+
+        if (!host) {
+            return;
+        }
+
+        if (!items.length) {
+            host.innerHTML =
+                '<div class="empty-state">' +
+                    '<span class="empty-icon"><svg class="icon"><use href="#i-messages"/></svg></span>' +
+                    '<div><h3>Nothing captured yet</h3>' +
+                    '<p>Messages appear here as soon as they arrive.</p></div>' +
+                '</div>';
+            return;
+        }
+
+        host.innerHTML = '<ul class="message-list">' + items.map(function (item) {
+            return '<li class="message-row' + (item.is_deleted ? ' deleted' : '') + '">' +
+                '<div class="meta">' +
+                    '<span class="avatar small">' +
+                        escapeHtml(String(item.contact || "?").slice(0, 1).toUpperCase()) +
+                    '</span>' +
+                    '<strong>' + escapeHtml(item.contact) + '</strong>' +
+                    '<span class="muted">' + escapeHtml(item.sent_at) + '</span>' +
+                    (item.is_deleted ? '<span class="pill danger">Deleted</span>' : '') +
+                '</div>' +
+                (item.summary
+                    ? '<p class="summary">' + escapeHtml(item.summary) + '</p>'
+                    : '') +
+                '<p class="raw">' + escapeHtml(item.body) + '</p>' +
+            '</li>';
+        }).join("") + '</ul>';
+    }
+
+    function renderLiveAlerts(items) {
+        var host = document.getElementById("alerts-live");
+
+        if (!host) {
+            return;
+        }
+
+        if (!items.length) {
+            host.innerHTML =
+                '<div class="empty-state compact">' +
+                    '<span class="empty-icon"><svg class="icon"><use href="#i-bell"/></svg></span>' +
+                    '<div><h3>No alerts yet</h3>' +
+                    '<p>New messages and deletions will show up here.</p></div>' +
+                '</div>';
+            return;
+        }
+
+        host.innerHTML = '<ul class="alert-list">' + items.map(function (item) {
+            var icon = item.kind === "deleted"
+                ? "i-trash"
+                : (item.kind === "summary" ? "i-info" : "i-chat");
+            var tone = item.kind === "deleted"
+                ? "danger"
+                : (item.kind === "summary" ? "accent" : "success");
+
+            return '<li class="alert-row' + (item.seen ? '' : ' unread') + '">' +
+                '<span class="title-icon ' + tone + '">' +
+                    '<svg class="icon"><use href="#' + icon + '"/></svg>' +
+                '</span>' +
+                '<div class="alert-content">' +
+                    '<div class="alert-meta">' +
+                        '<strong>' + escapeHtml(item.title) + '</strong>' +
+                        '<span class="muted">' + escapeHtml(item.time) + '</span>' +
+                    '</div>' +
+                    '<p class="alert-body">' + escapeHtml(item.body) + '</p>' +
+                '</div>' +
+                (item.seen
+                    ? ''
+                    : '<form method="post" action="/alerts/' + encodeURIComponent(item.id) +
+                      '/seen"><button type="submit" class="btn ghost small" ' +
+                      'title="Mark as seen">Seen</button></form>') +
+            '</li>';
+        }).join("") + '</ul>';
+    }
+
+    function renderLiveActions(unread) {
+        var host = document.getElementById("alerts-actions");
+
+        if (!host) {
+            return;
+        }
+
+        host.innerHTML = unread
+            ? '<span class="pill danger">' + escapeHtml(unread) + ' new</span>' +
+              '<form method="post" action="/alerts/seen-all">' +
+                  '<button type="submit" class="btn ghost small">' +
+                      '<svg class="icon"><use href="#i-check"/></svg> Mark all seen' +
+                  '</button>' +
+              '</form>'
+            : '';
+    }
+
+    function refreshLive() {
+        if (!liveSection) {
+            return;
+        }
+
+        var url = liveSection.dataset.liveUrl + window.location.search;
+
+        fetch(url, { credentials: "same-origin" })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("live refresh failed");
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                var snapshot = JSON.stringify(data);
+
+                if (snapshot === lastLiveSnapshot) {
+                    return;
+                }
+
+                lastLiveSnapshot = snapshot;
+                renderLiveMessages(data.messages || []);
+                renderLiveAlerts(data.alerts || []);
+                renderLiveActions(data.unread || 0);
+            })
+            .catch(function () {
+                // Keep whatever is already on screen.
+            });
+    }
+
+    if (liveSection) {
+        refreshLive();
+        setInterval(refreshLive, 5000);
+    }
+
+    // -----------------------------------------------------
     // Confirm destructive actions
     // -----------------------------------------------------
 
