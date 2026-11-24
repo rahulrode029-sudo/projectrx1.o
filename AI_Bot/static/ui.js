@@ -232,7 +232,15 @@
             return;
         }
 
-        host.innerHTML = (items || []).map(function (item) {
+        if (!items || !items.length) {
+            host.innerHTML =
+                '<p class="sessions-empty">No sessions recorded yet. ' +
+                'Turn on the eye next to a contact, then wait until ' +
+                "they're active on WhatsApp.</p>";
+            return;
+        }
+
+        host.innerHTML = items.map(function (item) {
             return '<span class="session-chip" title="' +
                     escapeHtml(item.contact) + '">' +
                     '<strong>' + escapeHtml(item.contact) + '</strong>' +

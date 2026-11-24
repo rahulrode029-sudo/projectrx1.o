@@ -166,6 +166,8 @@
                 <strong>{{ item.contact }}</strong>
                 <span>{{ item.start }} → {{ item.end }} · {{ item.minutes }} min</span>
             </span>
+        {% else %}
+            <p class="sessions-empty">No sessions recorded yet. Turn on the eye next to a contact, then wait until they're active on WhatsApp.</p>
         {% endfor %}
         </div>
 

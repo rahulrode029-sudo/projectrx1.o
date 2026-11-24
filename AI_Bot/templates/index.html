@@ -25,6 +25,23 @@
 
 <div class="chat-card">
 
+    <div class="chat-sessions">
+        <div class="sessions-head">
+            <svg class="icon"><use href="#i-clock"/></svg>
+            <span>WhatsApp sessions</span>
+        </div>
+        <div class="sessions-strip">
+        {% for item in sessions %}
+            <span class="session-chip" title="{{ item.contact }}">
+                <strong>{{ item.contact }}</strong>
+                <span>{{ item.start }} → {{ item.end }} · {{ item.minutes }} min</span>
+            </span>
+        {% else %}
+            <p class="sessions-empty">No sessions recorded yet. Turn on the eye next to a contact on the Messages page.</p>
+        {% endfor %}
+        </div>
+    </div>
+
     <header class="chat-header">
         <span class="bot-avatar"><svg class="icon"><use href="#i-bot"/></svg></span>
         <div class="chat-header-text">

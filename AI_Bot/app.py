@@ -64,7 +64,11 @@ def _display_time(value) -> str:
 def home():
     """The chat and voice page."""
 
-    return render_template("index.html")
+    with session_scope() as session:
+        rows = presence.recent_sessions(session)
+        sessions = [presence.session_data(row) for row in rows]
+
+    return render_template("index.html", sessions=sessions)
 
 
 def _messages_context() -> dict:

@@ -91,9 +91,11 @@ then subscribes to their presence and stores each window as:
 Amit Sharma · 24 Nov 11:10 → 11:25 · 15 min
 ```
 
-The same entry appears as a chip above the messages and as an
-`online_session` alert. Times are saved in UTC and shown in the display
-time zone. Very short blips are ignored and nearby sessions are merged.
+The same entry appears as a chip above the messages, in a compact strip
+on the Chat page, and as an `online_session` alert. When nothing has been
+recorded yet, the page shows a short hint instead of an empty box. Times
+are saved in UTC and shown in the display time zone. Very short blips are
+ignored and nearby sessions are merged.
 
 Tracking stops working while the app is closed, and WhatsApp never sends
 presence for contacts who hide their online/last-seen status from your

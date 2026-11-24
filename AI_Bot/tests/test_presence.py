@@ -175,12 +175,29 @@ def test_messages_page_and_live_snapshot_show_sessions(client, auth_headers, ses
     # 08:00/08:45 UTC → 13:30/14:15 IST.
     assert b"25 Nov 13:30 \xe2\x86\x92 25 Nov 14:15" in page.data
 
+    chat = client.get("/")
+
+    assert chat.status_code == 200
+    assert b"25 Nov 13:30 \xe2\x86\x92 25 Nov 14:15" in chat.data
+
     live = client.get("/messages/live").get_json()
 
     assert any(
         item["contact"] == "Live Contact" and item["minutes"] == 45
         for item in live["sessions"]
     )
+
+
+def test_no_sessions_shows_a_hint(other_client):
+    other = other_client[0]
+
+    messages = other.get("/messages")
+    chat = other.get("/")
+
+    assert messages.status_code == 200
+    assert b"No sessions recorded yet" in messages.data
+    assert chat.status_code == 200
+    assert b"No sessions recorded yet" in chat.data
 
 
 def test_another_owner_cannot_see_the_sessions(client, other_client, auth_headers, session):
