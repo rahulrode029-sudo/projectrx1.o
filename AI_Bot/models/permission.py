@@ -36,6 +36,10 @@ class ContactPreference(Base):
     )
     muted: Mapped[bool] = mapped_column(Boolean, default=False)
     notify_deleted: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Opt in to observing this contact's WhatsApp active sessions.
+    # Off by default: presence is only watched for contacts the owner
+    # explicitly chooses, which keeps sidecar subscriptions bounded.
+    track_sessions: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

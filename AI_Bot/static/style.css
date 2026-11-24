@@ -1231,6 +1231,57 @@ code {
     word-break: break-word;
 }
 
+/* Opt-in control on each contact row. */
+.track-btn.tracking-on {
+    color: var(--accent-text);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+/* WhatsApp active-session chips. */
+.sessions-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+}
+
+.sessions-head .icon {
+    color: var(--accent-text);
+}
+
+.sessions-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 0 0 15px;
+}
+
+.session-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: 12px;
+}
+
+.session-chip strong {
+    font-weight: 700;
+}
+
+.session-chip span {
+    color: var(--muted);
+}
+
 /* =====================================================
    WhatsApp linking
    ===================================================== */

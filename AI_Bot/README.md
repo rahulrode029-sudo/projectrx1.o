@@ -81,6 +81,24 @@ patch in `patches/`.
 
 > Use a spare number if you can. Baileys is an unofficial WhatsApp client.
 
+### Track WhatsApp sessions
+
+On the **Messages** page every contact has an eye button. Turn it on only
+for contacts whose WhatsApp active times you want to record. The sidecar
+then subscribes to their presence and stores each window as:
+
+```
+Amit Sharma · 24 Nov 11:10 → 11:25 · 15 min
+```
+
+The same entry appears as a chip above the messages and as an
+`online_session` alert. Times are saved in UTC and shown in the display
+time zone. Very short blips are ignored and nearby sessions are merged.
+
+Tracking stops working while the app is closed, and WhatsApp never sends
+presence for contacts who hide their online/last-seen status from your
+linked account.
+
 ---
 
 ## Configuration
@@ -111,9 +129,9 @@ AI_Bot/
 ├── run.py              starts the web app + one sidecar per user
 ├── config.py           settings from .env
 ├── database/           SQLite setup
-├── models/             accounts, contacts, conversations, messages, alerts
+├── models/             accounts, contacts, conversations, messages, alerts, presence sessions
 ├── routes/             auth, admin, alerts, chat, contacts, qr, recovery, voice, whatsapp
-├── services/           accounts, recovery, memory, gemini, whatsapp, spam_detector, app_guide
+├── services/           accounts, recovery, memory, gemini, whatsapp, presence, spam_detector, app_guide
 ├── security/           URL and file checks
 ├── templates/          web pages
 ├── static/             styles and browser scripts

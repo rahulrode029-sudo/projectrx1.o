@@ -51,7 +51,13 @@ def _set_sqlite_pragmas(dbapi_connection, connection_record):
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
-TENANT_TABLES = ("contacts", "conversations", "messages", "alerts")
+TENANT_TABLES = (
+    "contacts",
+    "conversations",
+    "messages",
+    "alerts",
+    "presence_sessions",
+)
 
 
 def _migrate_tenancy():
@@ -102,12 +108,38 @@ def _migrate_tenancy():
             )
 
 
+def _migrate_presence_preferences():
+    """Add the per-contact session-tracking opt-in to older databases."""
+
+    inspector = inspect(engine)
+
+    if "contact_preferences" not in set(inspector.get_table_names()):
+        return
+
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("contact_preferences")
+    }
+
+    if "track_sessions" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE contact_preferences "
+                "ADD COLUMN track_sessions BOOLEAN NOT NULL DEFAULT 0"
+            )
+        )
+
+
 def init_db():
     """Create the schema and upgrade older single-user databases."""
 
     import models  # noqa: F401  (imported so the tables are registered)
 
     Base.metadata.create_all(bind=engine)
+    _migrate_presence_preferences()
     _migrate_tenancy()
 
     from services.accounts import bootstrap_admin

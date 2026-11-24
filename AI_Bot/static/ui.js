@@ -225,6 +225,24 @@
         }).join("") + '</ul>';
     }
 
+    function renderLiveSessions(items) {
+        var host = document.getElementById("sessions-live");
+
+        if (!host) {
+            return;
+        }
+
+        host.innerHTML = (items || []).map(function (item) {
+            return '<span class="session-chip" title="' +
+                    escapeHtml(item.contact) + '">' +
+                    '<strong>' + escapeHtml(item.contact) + '</strong>' +
+                    '<span>' + escapeHtml(item.start) + ' → ' +
+                        escapeHtml(item.end) + ' · ' +
+                        escapeHtml(item.minutes) + ' min</span>' +
+                '</span>';
+        }).join("");
+    }
+
     function renderLiveAlerts(items) {
         var host = document.getElementById("alerts-live");
 
@@ -245,10 +263,14 @@
         host.innerHTML = '<ul class="alert-list">' + items.map(function (item) {
             var icon = item.kind === "deleted"
                 ? "i-trash"
-                : (item.kind === "summary" ? "i-info" : "i-chat");
+                : (item.kind === "online_session"
+                    ? "i-clock"
+                    : (item.kind === "summary" ? "i-info" : "i-chat"));
             var tone = item.kind === "deleted"
                 ? "danger"
-                : (item.kind === "summary" ? "accent" : "success");
+                : ((item.kind === "summary" || item.kind === "online_session")
+                    ? "accent"
+                    : "success");
 
             return '<li class="alert-row' + (item.seen ? '' : ' unread') + '">' +
                 '<span class="title-icon ' + tone + '">' +
@@ -310,6 +332,7 @@
 
                 lastLiveSnapshot = snapshot;
                 renderLiveMessages(data.messages || []);
+                renderLiveSessions(data.sessions || []);
                 renderLiveAlerts(data.alerts || []);
                 renderLiveActions(data.unread || 0);
             })

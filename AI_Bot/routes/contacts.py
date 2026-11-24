@@ -4,8 +4,8 @@ from flask import Blueprint, flash, redirect, request, url_for
 from sqlalchemy import select
 
 from database.database import session_scope
-from models import Alert, Contact, Conversation, Message
-from services import memory
+from models import Alert, Contact, Conversation, Message, PresenceSession
+from services import memory, presence
 from services.tenancy import current_owner_id
 
 bp = Blueprint("contacts", __name__, url_prefix="/contacts")
@@ -93,6 +93,9 @@ def delete(contact_id: int):
         session.query(Message).filter(Message.contact_id == contact.id).delete(
             synchronize_session=False
         )
+        session.query(PresenceSession).filter(
+            PresenceSession.contact_id == contact.id
+        ).delete(synchronize_session=False)
         session.query(Conversation).filter(
             Conversation.contact_id == contact.id
         ).update({Conversation.contact_id: None}, synchronize_session=False)
@@ -102,3 +105,29 @@ def delete(contact_id: int):
 
     flash(f"Removed {label} and its stored messages.", "success")
     return redirect(url_for("messages_page"))
+
+
+@bp.route("/<int:contact_id>/tracking", methods=["POST"])
+def tracking(contact_id: int):
+    """Opt this contact in or out of WhatsApp session tracking."""
+
+    enabled = request.form.get("enabled", "").lower() in (
+        "1", "true", "yes", "on"
+    )
+
+    label = presence.set_tracking(contact_id, enabled)
+
+    if label is None:
+        flash("That contact no longer exists.", "error")
+    else:
+        state = "on" if enabled else "off"
+        flash(f"WhatsApp session tracking for {label} is now {state}.", "success")
+
+    next_url = request.form.get("next", "")
+
+    # Only follow local paths. A posted `next` value must never become
+    # an open redirect to another site.
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = url_for("messages_page")
+
+    return redirect(next_url)

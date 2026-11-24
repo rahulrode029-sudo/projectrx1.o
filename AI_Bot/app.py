@@ -18,7 +18,7 @@ from config import settings
 from database.database import init_db, session_scope
 from models import Alert, Message
 from routes import admin, alerts, auth, chat, contacts, qr, recovery, voice, whatsapp
-from services import memory
+from services import memory, presence
 from services.tenancy import current_owner_id
 
 app = Flask(__name__)
@@ -102,6 +102,7 @@ def _messages_context() -> dict:
                 "id": item.id,
                 "label": item.label,
                 "mode": memory.get_preference(session, item).notify_mode,
+                "track": memory.get_preference(session, item).track_sessions,
             }
             for item in contacts
         ]
@@ -117,6 +118,13 @@ def _messages_context() -> dict:
             }
             for row in rows
         ]
+
+        session_rows = presence.recent_sessions(
+            session,
+            contact_id=contact.id if contact is not None else None,
+        )
+
+        sessions_data = [presence.session_data(row) for row in session_rows]
 
         alert_rows = list(
             session.scalars(
@@ -148,6 +156,7 @@ def _messages_context() -> dict:
     return {
         "contacts": contact_rows,
         "messages": message_rows,
+        "sessions": sessions_data,
         "alerts": alerts_data,
         "unread": unread,
         "query": contact_query,

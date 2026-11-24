@@ -58,8 +58,8 @@
     {% else %}
         <ul class="alert-list">
             {% for item in alerts %}
-                {% set alert_icon = "i-trash" if item.kind == "deleted" else ("i-info" if item.kind == "summary" else "i-chat") %}
-                {% set alert_tone = "danger" if item.kind == "deleted" else ("accent" if item.kind == "summary" else "success") %}
+                {% set alert_icon = "i-trash" if item.kind == "deleted" else ("i-clock" if item.kind == "online_session" else ("i-info" if item.kind == "summary" else "i-chat")) %}
+                {% set alert_tone = "danger" if item.kind == "deleted" else ("accent" if item.kind in ("summary", "online_session") else "success") %}
                 <li class="alert-row{% if not item.seen %} unread{% endif %}">
                     <span class="title-icon {{ alert_tone }}"><svg class="icon"><use href="#{{ alert_icon }}"/></svg></span>
                     <div class="alert-content">
@@ -115,6 +115,16 @@
                             <span class="contact-name">{{ contact.label }}</span>
                             <span class="mode-badge">{{ contact.mode }}</span>
                         </a>
+                        <form method="post" action="/contacts/{{ contact.id }}/tracking">
+                            <input type="hidden" name="enabled" value="{{ '0' if contact.track else '1' }}">
+                            <input type="hidden" name="next" value="{{ request.full_path if request.query_string else '/messages' }}">
+                            <button type="submit"
+                                    class="icon-btn track-btn{% if contact.track %} tracking-on{% endif %}"
+                                    title="{{ 'Stop tracking' if contact.track else 'Track WhatsApp sessions' }}"
+                                    aria-label="{{ 'Stop tracking ' if contact.track else 'Track WhatsApp sessions for ' }}{{ contact.label }}">
+                                <svg class="icon"><use href="#i-eye"/></svg>
+                            </button>
+                        </form>
                         <form method="post" action="/contacts/{{ contact.id }}/delete"
                               data-confirm="Delete {{ contact.label }} and all its stored messages? This cannot be undone.">
                             <button type="submit" class="icon-btn danger" title="Delete contact"
@@ -145,6 +155,19 @@
                 <a class="clear-link" href="/messages">Show all</a>
             {% endif %}
         </form>
+
+        <div class="sessions-head">
+            <svg class="icon"><use href="#i-clock"/></svg>
+            <span>WhatsApp sessions</span>
+        </div>
+        <div id="sessions-live" class="sessions-strip">
+        {% for item in sessions %}
+            <span class="session-chip" title="{{ item.contact }}">
+                <strong>{{ item.contact }}</strong>
+                <span>{{ item.start }} → {{ item.end }} · {{ item.minutes }} min</span>
+            </span>
+        {% endfor %}
+        </div>
 
         <div id="messages-live">
         {% if not messages %}

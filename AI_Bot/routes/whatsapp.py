@@ -13,7 +13,7 @@ from sqlalchemy import select
 from config import settings
 from database.database import session_scope
 from models import Contact, Message
-from services import accounts, memory
+from services import accounts, memory, presence
 from services import whatsapp as whatsapp_service
 from services.tenancy import current_owner_id, set_owner
 
@@ -145,6 +145,9 @@ def events():
         elif kind == "contact":
             result = _handle_contact(payload)
 
+        elif kind == "presence_session":
+            result = presence.record_session(payload)
+
         else:
             return jsonify({"error": f"unknown event type '{kind}'"}), 400
 
@@ -229,11 +232,24 @@ def contacts():
                 "name": row.label,
                 "phone": row.phone,
                 "notify_mode": memory.get_preference(session, row).notify_mode,
+                "track_sessions": memory.get_preference(session, row).track_sessions,
             }
             for row in rows
         ]
 
     return jsonify({"count": len(payload), "contacts": payload})
+
+
+@bp.route("/tracked", methods=["GET"])
+def tracked():
+    """JIDs this account opted into, for its sidecar to subscribe to."""
+
+    if not _authorised():
+        return jsonify({"error": "unauthorised"}), 401
+
+    jids = presence.tracked_jids()
+
+    return jsonify({"count": len(jids), "jids": jids})
 
 
 @bp.route("/mode", methods=["POST"])

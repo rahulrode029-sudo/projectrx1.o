@@ -69,6 +69,17 @@ let currentQr = null;
 let currentPairingCode = null;
 let isConnected = false;
 
+// Presence is watched only for contacts the owner opted into. The
+// watch list comes from the Python app, so the web toggle is the
+// single source of truth and one user can never watch another's list.
+let trackedJids = new Set();
+let presenceTimer = null;
+const presenceSessions = new Map();
+
+const PRESENCE_INTERVAL_MS = 8000;
+const STALE_AVAILABLE_SECONDS = 300;
+const MIN_SESSION_SECONDS = 60;
+
 // =====================================================
 // POSTING EVENTS
 // =====================================================
@@ -100,6 +111,183 @@ async function postEvent(payload) {
     console.error(`[event] ${payload.type} could not be sent:`, error.message);
     return false;
   }
+}
+
+// =====================================================
+// PRESENCE / ACTIVE SESSIONS
+// =====================================================
+
+/**
+ * WhatsApp sends Long-like timestamps in a few places. Normalise
+ * anything numeric into epoch seconds before posting it onward.
+ */
+function epochSeconds(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const number =
+    typeof value === 'object' && typeof value.toNumber === 'function'
+      ? value.toNumber()
+      : Number(value);
+
+  return Number.isFinite(number) ? Math.floor(number) : null;
+}
+
+/**
+ * Ask the app which contacts this account is tracking. Fetching the
+ * list every tick means a toggle in the web UI takes effect without
+ * restarting the sidecar.
+ */
+async function refreshTrackedJids() {
+  if (!isConnected || !sock) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${CONFIG.flaskUrl}/wa/tracked`, {
+      headers: {
+        'X-WA-Secret': CONFIG.sharedSecret,
+        'X-RX-Token': CONFIG.userToken,
+      },
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    const next = new Set(data.jids || []);
+
+    // Drop local state for anything the owner stopped tracking.
+    for (const jid of trackedJids) {
+      if (!next.has(jid)) {
+        presenceSessions.delete(jid);
+      }
+    }
+
+    trackedJids = next;
+
+    // Subscriptions expire after roughly ten seconds, so renew them
+    // on every tick for the contacts that are still selected.
+    for (const jid of trackedJids) {
+      try {
+        await sock.presenceSubscribe(jid);
+      } catch (error) {
+        console.error(`[presence] cannot watch ${jid}: ${error.message}`);
+      }
+    }
+  } catch (error) {
+    console.error('[presence] could not load the watch list:', error.message);
+  }
+}
+
+/**
+ * Finish a session and forward the time window. Very short blips are
+ * dropped here and merged server-side when they are close together.
+ */
+function closePresenceSession(jid, endEpoch, state) {
+  if (!state || !state.start) {
+    return;
+  }
+
+  const end = endEpoch || Math.floor(Date.now() / 1000);
+  const duration = end - state.start;
+
+  if (duration >= MIN_SESSION_SECONDS) {
+    void postEvent({
+      type: 'presence_session',
+      jid,
+      start_epoch: state.start,
+      end_epoch: end,
+    });
+  }
+
+  presenceSessions.set(jid, { start: null, lastAvailable: null });
+}
+
+/**
+ * An `unavailable` event does not always arrive (phone killed, network
+ * drop). Treat a long silence after the last available heartbeat as
+ * the end of the session.
+ */
+function finalizeStaleSessions() {
+  const now = Math.floor(Date.now() / 1000);
+
+  for (const [jid, state] of presenceSessions.entries()) {
+    if (
+      state.start &&
+      state.lastAvailable &&
+      now - state.lastAvailable > STALE_AVAILABLE_SECONDS
+    ) {
+      closePresenceSession(jid, state.lastAvailable, state);
+    }
+  }
+}
+
+function onPresenceUpdate({ id, presences }) {
+  for (const [jid, data] of Object.entries(presences || {})) {
+    if (!trackedJids.has(jid) || !data) {
+      continue;
+    }
+
+    const state =
+      presenceSessions.get(jid) || { start: null, lastAvailable: null };
+
+    const presence =
+      data.lastKnownPresence ||
+      data.presence ||
+      (data.presence && data.presence.lastKnownPresence) ||
+      '';
+
+    const now = Math.floor(Date.now() / 1000);
+
+    if (presence === 'available') {
+      if (!state.start) {
+        state.start = now;
+      }
+
+      state.lastAvailable = now;
+    } else if (presence === 'unavailable') {
+      const reported = epochSeconds(data.lastSeen);
+      const end =
+        reported && reported >= state.start
+          ? reported
+          : now;
+
+      closePresenceSession(jid, end, state);
+      continue;
+    }
+
+    presenceSessions.set(jid, state);
+  }
+}
+
+async function presenceTick() {
+  if (stopping) {
+    return;
+  }
+
+  await refreshTrackedJids();
+  finalizeStaleSessions();
+}
+
+function startPresenceWatch() {
+  if (presenceTimer) {
+    return;
+  }
+
+  void presenceTick();
+  presenceTimer = setInterval(() => void presenceTick(), PRESENCE_INTERVAL_MS);
+}
+
+function stopPresenceWatch() {
+  if (presenceTimer) {
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  }
+
+  presenceSessions.clear();
 }
 
 // =====================================================
@@ -642,10 +830,12 @@ async function startSocket() {
       isConnected = true;
       console.log('Connected to WhatsApp.');
       console.log(`Forwarding events to ${CONFIG.flaskUrl}`);
+      startPresenceWatch();
     }
 
     if (connection === 'close') {
       isConnected = false;
+      stopPresenceWatch();
 
       // Keep the code on screen while reconnecting. The keys that
       // back it live in the auth folder, which is now preserved, so
@@ -656,6 +846,7 @@ async function startSocket() {
         // A rejected login must not take the sidecar down for good.
         // Start over with a clean session and a fresh QR/code.
         console.log('Logged out. Clearing the session and starting over.');
+        trackedJids.clear();
         fs.rmSync(CONFIG.authFolder, { recursive: true, force: true });
         fs.mkdirSync(CONFIG.authFolder, { recursive: true });
         currentPairingCode = null;
@@ -680,6 +871,7 @@ async function startSocket() {
   sock.ev.on('messages.update', onMessagesUpdate);
   sock.ev.on('messages.delete', onMessagesDelete);
   sock.ev.on('contacts.upsert', onContactsUpsert);
+  sock.ev.on('presence.update', onPresenceUpdate);
 }
 
 process.on('SIGINT', async () => {

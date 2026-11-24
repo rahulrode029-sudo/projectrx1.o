@@ -12,6 +12,7 @@ from models.permission import (
     NOTIFY_MODES,
     ContactPreference,
 )
+from models.presence_session import PresenceSession
 from models.user import Contact
 from models.web_user import OtpCode, ResetToken, WebUser
 
@@ -20,6 +21,7 @@ __all__ = [
     "Conversation",
     "Message",
     "ContactPreference",
+    "PresenceSession",
     "NOTIFY_MODES",
     "DEFAULT_NOTIFY_MODE",
     "Contact",
