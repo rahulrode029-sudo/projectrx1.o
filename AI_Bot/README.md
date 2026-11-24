@@ -97,6 +97,12 @@ recorded yet, the page shows a short hint instead of an empty box. Times
 are saved in UTC and shown in the display time zone. Very short blips are
 ignored and nearby sessions are merged.
 
+Only the contacts with the eye switched on are watched. New contacts are
+off by default. The sidecar logs every selected-contact presence change
+(`[presence] ... available/unavailable`), so an empty session strip can be
+diagnosed from the launcher window. When WhatsApp hides `lastSeen`, the
+event time is used as the window end; exact last seen cannot be recovered.
+
 Tracking stops working while the app is closed, and WhatsApp never sends
 presence for contacts who hide their online/last-seen status from your
 linked account.

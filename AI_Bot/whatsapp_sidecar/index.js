@@ -34,6 +34,13 @@ import {
 } from 'baileys';
 import qrcode from 'qrcode-terminal';
 import { hasLinkedIdentity } from './session_check.js';
+import {
+  epochSeconds,
+  learnJidAlias,
+  presenceEndEpoch,
+  presenceStatus,
+  resolveTrackedJid,
+} from './presence_check.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,6 +82,9 @@ let isConnected = false;
 let trackedJids = new Set();
 let presenceTimer = null;
 const presenceSessions = new Map();
+// Learned from contacts.upsert: WhatsApp may report a person by phone
+// JID in one event and by LID in the next.
+const jidAliases = new Map();
 
 const PRESENCE_INTERVAL_MS = 8000;
 const STALE_AVAILABLE_SECONDS = 300;
@@ -118,23 +128,6 @@ async function postEvent(payload) {
 // =====================================================
 
 /**
- * WhatsApp sends Long-like timestamps in a few places. Normalise
- * anything numeric into epoch seconds before posting it onward.
- */
-function epochSeconds(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const number =
-    typeof value === 'object' && typeof value.toNumber === 'function'
-      ? value.toNumber()
-      : Number(value);
-
-  return Number.isFinite(number) ? Math.floor(number) : null;
-}
-
-/**
  * Ask the app which contacts this account is tracking. Fetching the
  * list every tick means a toggle in the web UI takes effect without
  * restarting the sidecar.
@@ -158,6 +151,7 @@ async function refreshTrackedJids() {
 
     const data = await response.json();
     const next = new Set(data.jids || []);
+    const before = [...trackedJids].sort().join(',');
 
     // Drop local state for anything the owner stopped tracking.
     for (const jid of trackedJids) {
@@ -167,6 +161,12 @@ async function refreshTrackedJids() {
     }
 
     trackedJids = next;
+
+    const after = [...trackedJids].sort().join(',');
+
+    if (before !== after) {
+      console.log(`[presence] watching ${trackedJids.size} selected contacts`);
+    }
 
     // Subscriptions expire after roughly ten seconds, so renew them
     // on every tick for the contacts that are still selected.
@@ -195,12 +195,17 @@ function closePresenceSession(jid, endEpoch, state) {
   const duration = end - state.start;
 
   if (duration >= MIN_SESSION_SECONDS) {
+    console.log(
+      `[presence] session ${jid}: ${state.start} → ${end} (${duration}s)`,
+    );
     void postEvent({
       type: 'presence_session',
       jid,
       start_epoch: state.start,
       end_epoch: end,
     });
+  } else {
+    console.log(`[presence] skipped ${duration}s blip for ${jid}`);
   }
 
   presenceSessions.set(jid, { start: null, lastAvailable: null });
@@ -225,37 +230,41 @@ function finalizeStaleSessions() {
   }
 }
 
-function onPresenceUpdate({ id, presences }) {
-  for (const [jid, data] of Object.entries(presences || {})) {
-    if (!trackedJids.has(jid) || !data) {
+function onPresenceUpdate({ presences }) {
+  for (const [rawJid, data] of Object.entries(presences || {})) {
+    const status = presenceStatus(data);
+
+    // Typing/composing updates are frequent and are not active windows.
+    if (status !== 'available' && status !== 'unavailable') {
       continue;
     }
+
+    // Baileys may use a device suffix or the other identifier family.
+    // Always post the JID the owner actually selected in the web UI.
+    const jid = resolveTrackedJid(rawJid, trackedJids, jidAliases);
+
+    if (!jid || !data) {
+      console.log(`[presence] ignored ${rawJid} (${status}) - not selected`);
+      continue;
+    }
+
+    console.log(
+      `[presence] ${jid} ${status}${rawJid !== jid ? ` (via ${rawJid})` : ''}`,
+    );
 
     const state =
       presenceSessions.get(jid) || { start: null, lastAvailable: null };
 
-    const presence =
-      data.lastKnownPresence ||
-      data.presence ||
-      (data.presence && data.presence.lastKnownPresence) ||
-      '';
-
     const now = Math.floor(Date.now() / 1000);
 
-    if (presence === 'available') {
+    if (status === 'available') {
       if (!state.start) {
         state.start = now;
       }
 
       state.lastAvailable = now;
-    } else if (presence === 'unavailable') {
-      const reported = epochSeconds(data.lastSeen);
-      const end =
-        reported && reported >= state.start
-          ? reported
-          : now;
-
-      closePresenceSession(jid, end, state);
+    } else {
+      closePresenceSession(jid, presenceEndEpoch(data, state.start, now), state);
       continue;
     }
 
@@ -758,6 +767,17 @@ async function onMessagesDelete(event) {
 async function onContactsUpsert(contacts) {
   for (const contact of contacts) {
     try {
+      // A person can arrive with both a phone JID and a LID. Remember
+      // the pair so presence events can be matched to the selected JID.
+      const lid = contact.lid || contact.id;
+      const phoneJid = contact.phoneNumber
+        ? `${contact.phoneNumber}@s.whatsapp.net`
+        : contact.id;
+
+      if (lid && phoneJid) {
+        learnJidAlias(lid, phoneJid, jidAliases);
+      }
+
       await postEvent({
         type: 'contact',
         jid: contact.id,
